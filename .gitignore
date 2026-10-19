@@ -1,0 +1,16 @@
+**/coverage/
+*.gcov
+lcov.info
+!**/test/ut/output/*.gcov
+GTestBase.*
+TesterBase.*
+Tester.*
+!**/test/ut/GTestBase.*
+!**/test/ut/TesterBase.*
+!**/test/ut/Tester.*
+seed-history
+
+__pycache__
+
+build/
+*.egg-info/
