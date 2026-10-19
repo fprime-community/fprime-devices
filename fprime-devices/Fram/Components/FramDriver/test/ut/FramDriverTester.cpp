@@ -4,7 +4,9 @@
 // ======================================================================
 
 #include "FramDriverTester.hpp"
+#include "fprime-devices/Fram/Subtopology/FramSubtopologyConfig/FramDeviceIdConfig.hpp"
 
+#include <cstdio>
 #include <cstring>
 
 #include "STest/Pick/Pick.hpp"
@@ -22,7 +24,7 @@ static constexpr FwSizeType HDR_BYTES = static_cast<FwSizeType>(Fram::HEADER_SIZ
 // Construction and destruction
 // ----------------------------------------------------------------------
 
-FramDriverTester ::FramDriverTester()
+FramDriverTester ::FramDriverTester(bool identified)
     : FramDriverGTestBase("FramDriverTester", FramDriverTester::MAX_HISTORY_SIZE),
       component("FramDriver"),
       m_clientData{},
@@ -41,6 +43,12 @@ FramDriverTester ::FramDriverTester()
       m_reenterData{} {
     this->initComponents();
     this->connectPorts();
+    if (identified) {
+        // Get the one-time startup RDID out of the way so the tests below see an idle driver
+        this->startIdentification();
+        this->completeIdentification(Fram::EXPECTED_DEVICE_ID);
+        this->assertIdle();
+    }
 }
 
 FramDriverTester ::~FramDriverTester() {
@@ -388,6 +396,93 @@ void FramDriverTester ::assertWriteFrame(U32 offset, const Fw::Buffer& data) {
 void FramDriverTester ::assertNoReply() {
     ASSERT_from_readComplete_SIZE(0);
     ASSERT_from_writeComplete_SIZE(0);
+}
+
+void FramDriverTester ::startIdentification() {
+    this->clearHistory();
+    ASSERT_TRUE(this->invoke_to_activeIn(SCHED_PORT, 0));
+    this->assertNoReply();
+    ASSERT_from_spiWriteReadOut_SIZE(1);
+    ASSERT_EQ(1 + FramDriver::DEVICE_ID_SIZE, this->m_lastFrameSize);
+    ASSERT_EQ(FramDriver::OPCODE_RDID, this->m_lastTx[0]);
+    for (FwSizeType i = 1; i < this->m_lastFrameSize; i++) {
+        ASSERT_EQ(0, this->m_lastTx[i]) << "RDID dummy byte " << i;
+    }
+    ASSERT_EVENTS_SIZE(0);
+}
+
+void FramDriverTester ::completeIdentification(const U8* deviceId) {
+    ASSERT_EQ(1 + FramDriver::DEVICE_ID_SIZE, this->m_lastRead.getSize());
+    U8* const rx = this->m_lastRead.getData();
+    rx[0] = 0xFF;  // what the device shifts out while receiving the opcode
+    (void)std::memcpy(&rx[1], deviceId, FramDriver::DEVICE_ID_SIZE);
+    this->completeSpi(Drv::SpiStatus::SPI_OK);
+    ASSERT_EVENTS_SIZE(0);  // nothing is logged from the ISR path
+    this->deliver();
+    this->assertNoReply();
+}
+
+void FramDriverTester ::testIdentifyMatch() {
+    this->startIdentification();
+    this->completeIdentification(Fram::EXPECTED_DEVICE_ID);
+    ASSERT_EVENTS_SIZE(0);
+    this->assertIdle();  // and no second RDID on the next tick
+    this->runTransaction(true, 0, 0x10, 8, SpiFault::NONE);
+    this->assertIdle();
+}
+
+void FramDriverTester ::testIdentifyMismatch() {
+    U8 other[FramDriver::DEVICE_ID_SIZE];
+    (void)std::memcpy(other, Fram::EXPECTED_DEVICE_ID, sizeof other);
+    other[0] = 0x00;
+    other[sizeof other - 1] = static_cast<U8>(other[sizeof other - 1] ^ 0x01);
+    this->startIdentification();
+    this->completeIdentification(other);
+    ASSERT_EVENTS_SIZE(1);
+    ASSERT_EVENTS_FramDeviceIdMismatch_SIZE(1);
+    char expectedHex[2 * FramDriver::DEVICE_ID_SIZE + 1] = {};
+    char gotHex[2 * FramDriver::DEVICE_ID_SIZE + 1] = {};
+    for (FwSizeType i = 0; i < FramDriver::DEVICE_ID_SIZE; i++) {
+        (void)snprintf(&expectedHex[2 * i], 3, "%02X", Fram::EXPECTED_DEVICE_ID[i]);
+        (void)snprintf(&gotHex[2 * i], 3, "%02X", other[i]);
+    }
+    // The autocoder serializes event strings to at most FW_LOG_STRING_MAX_SIZE characters
+    // (FW_MIN with the declared size 24); compare what can actually arrive.
+    const FwSizeType visible = FW_MIN(static_cast<FwSizeType>(FW_LOG_STRING_MAX_SIZE), 2 * FramDriver::DEVICE_ID_SIZE);
+    expectedHex[visible] = '\0';
+    gotHex[visible] = '\0';
+    ASSERT_EVENTS_FramDeviceIdMismatch(0, expectedHex, gotHex);
+    // Informational only: the driver is idle and keeps serving requests
+    this->assertIdle();
+    this->runTransaction(false, 1, 0x20, 4, SpiFault::NONE);
+    this->runTransaction(true, 1, 0x20, 4, SpiFault::NONE);
+    this->assertIdle();
+}
+
+void FramDriverTester ::testIdentifySpiError() {
+    this->startIdentification();
+    this->completeSpi(Drv::SpiStatus::SPI_OTHER_ERR);
+    this->deliver();
+    this->assertNoReply();
+    ASSERT_EVENTS_SIZE(0);
+    this->assertIdle();  // not identified, not retried
+    this->runTransaction(true, 0, 0x30, 16, SpiFault::NONE);
+    this->assertIdle();
+}
+
+void FramDriverTester ::testIdentifyBusy() {
+    U8 data[4] = {1, 2, 3, 4};
+    Fw::Buffer buffer(data, sizeof data);
+    this->startIdentification();
+    this->request(true, 0, 0x40, buffer);
+    this->assertRejected(true, 0, 0x40, buffer, Fram::Status::BUSY);
+    this->request(false, 1, 0x40, buffer);
+    this->assertRejected(false, 1, 0x40, buffer, Fram::Status::BUSY);
+    ASSERT_from_spiWriteReadOut_SIZE(0);  // nothing new on the bus
+    this->completeIdentification(Fram::EXPECTED_DEVICE_ID);
+    ASSERT_EVENTS_SIZE(0);
+    this->assertIdle();
+    this->runTransaction(true, 0, 0x40, 4, SpiFault::NONE);
 }
 
 void FramDriverTester ::assertIdle() {

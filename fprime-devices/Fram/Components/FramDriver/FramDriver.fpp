@@ -43,5 +43,21 @@ module Fram {
         @ accepted requests are delivered to clients from here, in main context, never from
         @ the SPI ISR. Returns true when a reply was delivered on this call.
         sync input port activeIn: Svc.ActiveSched
+
+        # ----------------------------------------------------------------------
+        # Startup device identification (REQ-FRAM-013..015)
+        # ----------------------------------------------------------------------
+
+        @ The RDID (9Fh) read issued on the first activeIn tick returned a device ID other
+        @ than Fram::EXPECTED_DEVICE_ID (FramSubtopologyConfig.hpp). Both IDs as 9 bytes of
+        @ hex. Informational: reads and writes are not blocked by a mismatch.
+        event FramDeviceIdMismatch(
+            expected: string size 24 @< Configured ID (Fram::EXPECTED_DEVICE_ID)
+            got: string size 24 @< ID read back from the device
+        ) severity warning high format "FRAM device id mismatch, expected {} got {}"
+
+        event port eventOut
+        text event port textEventOut
+        time get port timeGetOut
     }
 }

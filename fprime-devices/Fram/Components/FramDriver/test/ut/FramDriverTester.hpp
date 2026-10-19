@@ -41,7 +41,7 @@ class FramDriverTester final : public FramDriverGTestBase {
     // ----------------------------------------------------------------------
 
     //! Construct object FramDriverTester
-    FramDriverTester();
+    explicit FramDriverTester(bool identified = true);
 
     //! Destroy object FramDriverTester
     ~FramDriverTester();
@@ -83,6 +83,18 @@ class FramDriverTester final : public FramDriverGTestBase {
 
     //! Many random transactions (port, direction, offset, size, fault) end with an idle driver
     void testRandomTransactions();
+
+    //! Startup RDID returning the configured ID: no event, driver idle, normal reads follow
+    void testIdentifyMatch();
+
+    //! Startup RDID returning another ID: one FramDeviceIdMismatch with both IDs as hex
+    void testIdentifyMismatch();
+
+    //! SPI failure on the RDID frame: no event, driver back to IDLE, normal reads follow
+    void testIdentifySpiError();
+
+    //! Client requests while the RDID frame is in flight are rejected BUSY
+    void testIdentifyBusy();
 
   private:
     // ----------------------------------------------------------------------
@@ -135,6 +147,12 @@ class FramDriverTester final : public FramDriverGTestBase {
 
     //! Assert the driver is idle: activeIn has nothing to deliver
     void assertIdle();
+
+    //! Tick an un-identified idle driver and check the RDID frame it puts on the bus
+    void startIdentification();
+
+    //! Complete the RDID frame with the given 9-byte ID and deliver the outcome on activeIn
+    void completeIdentification(const U8* deviceId);
 
     //! Mock SPI driver completion of the last frame, from "ISR" context
     void completeSpi(Drv::SpiStatus::T status);

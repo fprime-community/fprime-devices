@@ -7,6 +7,7 @@
 #define Fram_FramDriver_HPP
 
 #include "Fw/Buffer/Buffer.hpp"
+#include "Fw/Types/StringTemplate.hpp"
 #include "fprime-devices/Fram/Components/FramDriver/FramDriverComponentAc.hpp"
 #include "fprime-devices/Fram/FramConfig/FppConstantsAc.hpp"
 #include "fprime-devices/Fram/Types/FppConstantsAc.hpp"
@@ -42,6 +43,13 @@ class FramDriver final : public FramDriverComponentBase {
     static constexpr U8 OPCODE_WREN = 0x06;   //!< Set the write-enable latch
     static constexpr U8 OPCODE_WRITE = 0x02;  //!< Write memory data
     static constexpr U8 OPCODE_READ = 0x03;   //!< Read memory data
+    static constexpr U8 OPCODE_RDID = 0x9F;   //!< Read device ID
+
+    //! Bytes in the device ID returned by RDID
+    static constexpr FwSizeType DEVICE_ID_SIZE = 9;
+
+    //! A device ID rendered as hex; sized independently of FW_FIXED_LENGTH_STRING_SIZE
+    using HexString = Fw::StringTemplate<2 * DEVICE_ID_SIZE + 1>;
 
     //! Bytes in the largest READ/WRITE frame: opcode, address, then MaxTransfer data bytes
     static constexpr FwSizeType FRAME_SIZE = Fram::HEADER_SIZE + Fram::Config::MaxTransfer;
@@ -58,7 +66,7 @@ class FramDriver final : public FramDriverComponentBase {
     };
 
     //! Which client port family the in-flight transaction replies on
-    enum class Operation : U8 { READ, WRITE };
+    enum class Operation : U8 { READ, WRITE, IDENTIFY };  //!< IDENTIFY: startup RDID, no client
 
     // ----------------------------------------------------------------------
     // Handler implementations for typed input ports
@@ -115,6 +123,15 @@ class FramDriver final : public FramDriverComponentBase {
     //! Latch the outcome of the in-flight transaction for delivery on activeIn
     void finish(Fram::Status status);
 
+    //! Stage and start the one-time RDID frame (REQ-FRAM-013)
+    void identify();
+
+    //! Compare the ID clocked in by RDID with Fram::EXPECTED_DEVICE_ID; event on difference
+    void checkDeviceId();
+
+    //! Render size bytes as upper-case hex into out
+    static void toHex(const U8* bytes, FwSizeType size, HexString& out);
+
     // ----------------------------------------------------------------------
     // Member variables
     // ----------------------------------------------------------------------
@@ -122,6 +139,7 @@ class FramDriver final : public FramDriverComponentBase {
     //! Transaction state. Written from both main context and the SPI ISR; every transition
     //! is owned by exactly one of them (see the state machine in docs/sdd.md).
     volatile State m_state;
+    bool m_identified;                  //!< RDID has been issued (once, first activeIn in IDLE)
 
     Operation m_operation;              //!< Client family of the in-flight transaction
     FwIndexType m_portNum;              //!< Client port index of the in-flight transaction

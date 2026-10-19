@@ -4,7 +4,9 @@
 // ======================================================================
 
 #include "fprime-devices/Fram/Components/FramDriver/FramDriver.hpp"
+#include "fprime-devices/Fram/Subtopology/FramSubtopologyConfig/FramDeviceIdConfig.hpp"
 
+#include <cstdio>
 #include <cstring>
 
 #include "Fw/Types/Assert.hpp"
@@ -17,6 +19,8 @@ namespace Fram {
 constexpr U8 FramDriver::OPCODE_WREN;
 constexpr U8 FramDriver::OPCODE_WRITE;
 constexpr U8 FramDriver::OPCODE_READ;
+constexpr U8 FramDriver::OPCODE_RDID;
+constexpr FwSizeType FramDriver::DEVICE_ID_SIZE;
 constexpr FwSizeType FramDriver::FRAME_SIZE;
 
 // ----------------------------------------------------------------------
@@ -26,6 +30,7 @@ constexpr FwSizeType FramDriver::FRAME_SIZE;
 FramDriver ::FramDriver(const char* const compName)
     : FramDriverComponentBase(compName),
       m_state(State::IDLE),
+      m_identified(false),
       m_operation(Operation::READ),
       m_portNum(0),
       m_offset(0),
@@ -48,6 +53,12 @@ bool FramDriver ::activeIn_handler(FwIndexType portNum, U32 context) {
     (void)portNum;  // One cycler drives this component
     (void)context;  // The cycler's call-order token is unused here
 
+    if (this->m_state == State::IDLE && !this->m_identified) {
+        // First tick with the bus idle: events and SPI are connected by now (REQ-FRAM-013)
+        this->m_identified = true;
+        this->identify();
+        return true;
+    }
     if (this->m_state == State::WRITE_PENDING) {
         // WREN completed in the ISR; the latch is set, clock the WRITE frame staged by
         // write_handler. Done here rather than from the SPI completion because the DMAC
@@ -62,6 +73,15 @@ bool FramDriver ::activeIn_handler(FwIndexType portNum, U32 context) {
         return false;
     }
 
+    if (this->m_operation == Operation::IDENTIFY) {
+        // No client behind the RDID frame; a SPI failure leaves the part unidentified
+        const Fram::Status status = this->m_status;
+        this->m_state = State::IDLE;
+        if (status == Fram::Status::OK) {
+            this->checkDeviceId();
+        }
+        return true;
+    }
     const FwSizeType size = this->m_clientBuffer.getSize();
     if (this->m_operation == Operation::READ && this->m_status == Fram::Status::OK) {
         // The first HEADER_SIZE bytes clocked in are what the device shifted out while it was
@@ -227,6 +247,43 @@ void FramDriver ::startTransfer(U8* tx, U8* rx, FwSizeType frameSize) {
     // The SPI driver replies through spiReplyIn: from the DMAC ISR when the frame completes,
     // or SYNCHRONOUSLY from inside this call if it is busy with another slot's transaction.
     this->spiWriteReadOut_out(0, this->m_spiWrite, this->m_spiRead);
+}
+
+void FramDriver ::identify() {
+    static_assert(1 + DEVICE_ID_SIZE <= FRAME_SIZE, "RDID frame must fit the staging buffers");
+    static_assert(sizeof(Fram::EXPECTED_DEVICE_ID) == DEVICE_ID_SIZE, "EXPECTED_DEVICE_ID is 9 bytes");
+    this->m_operation = Operation::IDENTIFY;
+    this->m_portNum = 0;
+    this->m_offset = 0;
+    this->m_clientBuffer = Fw::Buffer();
+    this->m_status = Fram::Status::OK;
+    // RDID: opcode, then DEVICE_ID_SIZE dummy bytes while the ID is clocked in
+    this->m_tx[0] = OPCODE_RDID;
+    (void)std::memset(&this->m_tx[1], 0, DEVICE_ID_SIZE);
+    this->m_state = State::READ_IN_FLIGHT;
+    this->startTransfer(this->m_tx, this->m_rx, 1 + DEVICE_ID_SIZE);
+}
+
+void FramDriver ::checkDeviceId() {
+    // Byte 0 is what the device shifted out while receiving the opcode; the ID follows
+    const U8* const got = &this->m_rx[1];
+    if (std::memcmp(got, Fram::EXPECTED_DEVICE_ID, DEVICE_ID_SIZE) == 0) {
+        return;
+    }
+    HexString expectedHex;
+    HexString gotHex;
+    toHex(Fram::EXPECTED_DEVICE_ID, DEVICE_ID_SIZE, expectedHex);
+    toHex(got, DEVICE_ID_SIZE, gotHex);
+    this->log_WARNING_HI_FramDeviceIdMismatch(expectedHex, gotHex);
+}
+
+void FramDriver ::toHex(const U8* bytes, FwSizeType size, HexString& out) {
+    char text[2 * DEVICE_ID_SIZE + 1] = {};
+    FW_ASSERT(size <= DEVICE_ID_SIZE, static_cast<FwAssertArgType>(size));
+    for (FwSizeType i = 0; i < size; i++) {
+        (void)snprintf(&text[2 * i], sizeof text - 2 * i, "%02X", bytes[i]);
+    }
+    out = text;
 }
 
 void FramDriver ::finish(Fram::Status status) {

@@ -6,5 +6,6 @@ register_fprime_config(
         "${CMAKE_CURRENT_LIST_DIR}/FramSubtopologyConfig.fpp"
     HEADERS
         "${CMAKE_CURRENT_LIST_DIR}/FramSubtopologyConfig.hpp"
+        "${CMAKE_CURRENT_LIST_DIR}/FramDeviceIdConfig.hpp"
     INTERFACE
 )

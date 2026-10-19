@@ -89,6 +89,36 @@ TEST(OffNominal, UnexpectedSpiReply) {
     tester.testUnexpectedSpiReply();
 }
 
+TEST(Identify, Match) {
+    COMMENT("Startup RDID (9Fh) returning Fram::EXPECTED_DEVICE_ID: no event, driver idle afterwards");
+    REQUIREMENT("FRAM-013");
+    REQUIREMENT("FRAM-014");
+    REQUIREMENT("FRAM-016");
+    Fram::FramDriverTester tester(false);
+    tester.testIdentifyMatch();
+}
+
+TEST(Identify, Mismatch) {
+    COMMENT("Startup RDID returning another ID: one FramDeviceIdMismatch (WARNING_HI) with both IDs as hex");
+    REQUIREMENT("FRAM-014");
+    Fram::FramDriverTester tester(false);
+    tester.testIdentifyMismatch();
+}
+
+TEST(Identify, SpiError) {
+    COMMENT("SPI failure on the RDID frame: existing SPI_ERROR path, no event, driver returns to IDLE");
+    REQUIREMENT("FRAM-015");
+    Fram::FramDriverTester tester(false);
+    tester.testIdentifySpiError();
+}
+
+TEST(Identify, Busy) {
+    COMMENT("Client requests during the RDID frame are rejected BUSY");
+    REQUIREMENT("FRAM-015");
+    Fram::FramDriverTester tester(false);
+    tester.testIdentifyBusy();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     STest::Random::seed();

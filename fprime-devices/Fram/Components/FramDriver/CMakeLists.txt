@@ -7,6 +7,7 @@ register_fprime_module(
         fprime-devices_Fram_Types
         fprime-devices_Fram_Ports
         fprime-samd_Drv_Types
+        fprime-devices_Fram_Subtopology_FramSubtopologyConfig
 )
 
 ### Unit Tests ###

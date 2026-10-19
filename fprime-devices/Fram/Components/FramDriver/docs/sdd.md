@@ -33,6 +33,10 @@ every `WRITE`, which is why a write is two SPI transactions.
 | REQ-FRAM-010 | The FramDriver shall be a passive component with synchronous input ports and shall not block on hardware. | Inspection |
 | REQ-FRAM-011 | The FramDriver shall `FW_ASSERT` on an unexpected SPI reply: a reply while no SPI frame is in flight, or a reply carrying buffers other than its own staging buffers. | Unit Test |
 | REQ-FRAM-012 | The FramDriver shall deliver client replies from the main (non-ISR) context: the SPI completion is latched in the ISR and the reply is issued on the next `activeIn` tick. | Unit Test |
+| REQ-FRAM-013 | The FramDriver shall read the 9-byte device ID with `RDID` (9Fh) once at startup, after event reporting is available: from the first `activeIn` tick that finds the driver idle, never from `configure()` or the constructor. | Unit Test, Hardware Test |
+| REQ-FRAM-014 | The FramDriver shall compare the ID with `Fram::EXPECTED_DEVICE_ID` (`FramSubtopologyConfig`, default CY15B102QN) and emit `FramDeviceIdMismatch` (WARNING_HI, both IDs as hex) on any difference; no event on a match. A mismatch does not block reads or writes. | Unit Test, Hardware Test |
+| REQ-FRAM-015 | The ID read shall use the existing transaction machinery: the driver is `BUSY` to clients while it is in flight, the outcome is delivered in main context (REQ-FRAM-012), and an SPI failure takes the existing `SPI_ERROR` path, leaving the part unidentified with no event and no retry. | Unit Test |
+| REQ-FRAM-016 | REQ-FRAM-001..012 are unchanged by the ID read; it reuses the READ/WRITE staging buffers (10 bytes). | Unit Test |
 
 Status values: `OK`, `BUSY`, `OUT_OF_RANGE`, `TOO_LARGE`, `SPI_ERROR` (`Fram.Status`, see `Fram/Types/Types.fpp`).
 
@@ -108,6 +112,33 @@ from inside the request call**, on the matching reply port, with no SPI traffic.
 Clients must therefore commit their own state before issuing a request (see
 `CuriosityReference/FramTester/docs/sdd.md` §3.5 for the client contract).
 
+### 3.4.1 Startup device identification (REQ-FRAM-013..016)
+
+The first `activeIn` tick that finds the driver `IDLE` (normally the first tick after
+`configure()`, when the SPI host and the event ports are connected) stages one `RDID`
+frame — `9Fh` followed by nine `00h` dummy bytes, 10 bytes under one chip select — in the
+READ/WRITE staging buffers and clocks it through the normal `READ_IN_FLIGHT` state with
+`Operation::IDENTIFY`. Clients see `BUSY` until it completes. The outcome is latched in the
+SPI ISR like any frame and consumed on the next tick in main context: on `OK` bytes
+`rx[1..9]` are compared with `Fram::EXPECTED_DEVICE_ID`; a difference logs
+`FramDeviceIdMismatch` with both IDs rendered as 18 upper-case hex characters. Any other
+outcome (SPI failure) returns the driver to `IDLE` silently: the part is simply not
+identified, and no retry port exists. The read happens exactly once per boot
+(`m_identified`); the event is never raised from `configure()`, the constructor or ISR
+context, so it cannot fire before the port connections are made, and the autocoded
+`log_WARNING_HI_*` call is itself guarded by `isConnected` on the event ports.
+
+Expected ID (`FramDeviceIdConfig.hpp`, part of `FramSubtopologyConfig`), stored in wire
+order: Infineon datasheet 002-26764 Rev. *D (CY15B102QN/CY15V102QN, 2022-09-12), section
+"Read device ID (RDID, 9Fh)" and the "Ordering information" table, give the CY15B102QN ID as
+`7F7F7F7F7F7FC22A00` MSB first — six `7Fh` JEDEC continuation bytes, manufacturer `C2h`,
+product ID `2A00h` — and state that byte 0 (least significant) shifts out first, so the
+driver receives `00 2A C2 7F 7F 7F 7F 7F 7F` (verified on the Curiosity Nano bench: the
+mismatch event reports `got 002AC27F7F7F7F7F7F` when the MSB-first value is configured).
+The CY15V102QN reads `…C22A04`. A different fitted part only needs this constant changed.
+The strings in the event are 18 characters; a deployment whose `FW_LOG_STRING_MAX_SIZE` is
+smaller (the SAMD21 reference uses 2) sees them truncated.
+
 ### 3.5 Error handling
 
 - Any `Drv::SpiStatus` other than `SPI_OK` in any phase → `SPI_ERROR`; for a write
@@ -153,7 +184,9 @@ buffer identity, same-index completion on all client ports, every rejection
 (zero size, oversize, end-of-device, overflow, busy), SPI failure in each phase
 including the WREN abort, synchronous rejection by the SPI host, replies only on
 `activeIn`, client re-entrancy from the completion callback, 1000 randomized
-transactions, and the assertion on a stray SPI reply.
+transactions, the assertion on a stray SPI reply, and the startup identification
+(matching ID with no event, mismatching ID with the event strings, SPI failure on the
+`RDID` frame returning to `IDLE`, clients rejected `BUSY` while it is in flight).
 
 ## 6. Tested configurations
 
