@@ -44,9 +44,6 @@ command set, address format and status register.
 | REQ-FramDriver-022 | A write overlapping the block-protected range shall be rejected with status WRITE_PROTECTED. | Unit Test |
 | REQ-FramDriver-023 | Data written by the component shall read back equal after an MCU reset. | Inspection (one-off bench reset test L3-1) |
 
-Retired at the human gate (2026-10-29): REQ-019 "no fprime-samd dependency" is a design constraint (see Design), REQ-020
-"read-back on CuriosityReference" is test design (see Tests); neither is a requirement on the component.
-
 Table 1 — Constants (compile-time configuration)
 
 | Name | Value | Meaning |
@@ -90,17 +87,19 @@ Table 4 — Status values (returned by the request call; OK and SPI_ERROR also c
 | SPI_ERROR | The SPI driver reported an error for a frame of this request (by completion, or by the call when the SPI driver refused the first frame inside it with other than SPI_BUSY_ERR) |
 | WRITE_PROTECTED | The write overlaps the block-protected range (BP1:BP0 read at startup; datasheet Table 5: 01 = 30000h–3FFFFh, 10 = 20000h–3FFFFh, 11 = all); if the startup status-register read failed the range is taken as empty |
 
-Waivers (no row; owner or reason)
+Out-of-scope failure modes
 
-- Requests from interrupt context — deployment constraint: all clients run in main context (CuriosityReference is passive-only).
-- Completion before the request call returns (REQ-005 ordering) and a request from inside such a completion (REQ-010) — hold under the §Ports deployment constraint only: the SPI driver delivers completions from its own entry (Samd21.SpiDriver). With a driver completing inside `spiWriteRead` the completion may precede ACCEPTED and a request made inside it is rejected BUSY/REENTRANT_IN_CALL (bounded); owner: deployment.
-- Spurious or buffer-mismatched completion callback — owned by the SPI driver (`Drv.SpiWriteReadCallback` contract: one callback per request with the request's buffers).
-- Completion that never arrives — owned by the SPI driver's bus-error recovery (fprime-samd `Samd21.SpiDriver` SDD); the human ruled this component gets no timeout of its own.
-- Device lost or replaced after startup — undetectable (the SPI protocol carries no acknowledgement); clients validate their own data.
-- Startup entry called twice or during a transfer — owner: deployment topology (F Prime init contract calls it once, from the start sequence).
-- MCU reset between the write-enable and write frames — benign: only the device's WEL latch is left set (datasheet §4.1.1).
-- Startup window: client requests made while the two startup reads are outstanding are rejected BUSY (REQ-007); nominal boot, clients retry. No WRSR path: block protect is a deliberate configuration, reported not cleared.
-- Writes before a successful status-register read (startup not yet called, or that read failed) — protected range unknown, treated as empty, so a write into a protected block completes OK and is discarded by the device; owner: deployment (call startup() before clients run; StatusRegister = 0 with StartupState = READ_FAILED flags the unknown range).
+| Failure mode | Why out of scope |
+|---|---|
+| Request from interrupt context | Deployment constraint: all clients run in main context |
+| Completion before the request call returns, or a request from inside it (REQ-005, REQ-010) | Hold under the §Ports deployment constraint; otherwise the completion may precede ACCEPTED and the inner request is rejected BUSY (bounded) |
+| Spurious or buffer-mismatched completion | SPI driver contract: one callback per request with its buffers |
+| Completion that never arrives | SPI driver bus-error recovery; this component has no timeout |
+| Device lost or replaced after startup | Undetectable over SPI (no acknowledgement); clients validate their data |
+| Startup entry called twice or during a transfer | Topology calls it once, from the start sequence |
+| MCU reset between the WREN and WRITE frames | Benign: only the device's WEL latch stays set (datasheet §4.1.1) |
+| Request while the two startup reads are outstanding | Rejected BUSY; clients retry. Block protect is reported, never cleared (no WRSR) |
+| Write before a successful status-register read | Protected range unknown, treated as empty: the device discards the write silently; StatusRegister = 0 with StartupState READ_FAILED flags it |
 
 ## Design
 
@@ -126,7 +125,7 @@ single-context by **deployment constraint**: a passive `Drv.AsyncGuardedSpi` dri
 entry in the clients' context (the port promises only "non-interrupt context"; `Samd21.SpiDriver` complies); `guarded`
 would re-enter the non-recursive mutex under REQ-010. No commands, no parameters.
 
-Design constraint (retired REQ-019): the library uses framework modules only (`Drv`, `Fw`) — no `fprime-samd` symbol; the
+Design constraint: the library uses framework modules only (`Drv`, `Fw`) — no `fprime-samd` symbol; the
 build entry gate checks it (native build of `Fram/` against `nasa/fprime` alone).
 
 ### Events and telemetry
@@ -190,7 +189,7 @@ instance framDriver: Fram.FramDriver base id 0xDD00 {
 Request checks, in the call, in this order (no overflow):
 1. BUSY — any transfer (client or startup) in progress.
 2. OUT_OF_RANGE — `N == 0`, `N > MaxTransfer` or `offset > Size - N`.
-3. WRITE_PROTECTED — a write overlapping the BP1:BP0 range from a successful startup RDSR (unknown range = empty, see Waivers).
+3. WRITE_PROTECTED — a write overlapping the BP1:BP0 range from a successful startup RDSR (unknown range = empty, see Out-of-scope failure modes).
 
 Frames, from component-owned transmit/receive buffers of `4 + MaxTransfer` bytes (the client's buffer never reaches the SPI
 driver): read = `READ addr` with the received tail copied to the client's buffer; write = `WREN`, then `WRITE addr data`;
@@ -286,4 +285,4 @@ sequenceDiagram
 | L7-1 | Known pseudo-random image left at 0x3FF00 for the auditor's dump | REQ-FramDriver-001, 002 |
 | UT rows above | Unit tests of the Unit-test list | REQ-FramDriver-005, 009, 013, 014, 021, 022 have unit tests only (plan W1/W2) |
 | Inspection | No thread/queue | REQ-FramDriver-018 |
-| Build entry gate | Library builds against nasa/fprime alone (design constraint, retired REQ-019) | — |
+| Build entry gate | Library builds against nasa/fprime alone (design constraint) | — |
