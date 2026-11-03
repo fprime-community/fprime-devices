@@ -22,27 +22,27 @@ command set, address format and status register.
 
 | ID | Requirement | Verification |
 |---|---|---|
-| REQ-FramDriver-001 | The component shall read N bytes at a byte offset into the requester's buffer. | Unit Test |
-| REQ-FramDriver-002 | The component shall write N bytes at a byte offset from the requester's buffer. | Unit Test |
-| REQ-FramDriver-003 | Reads and writes shall follow datasheet 002-26764 Rev. *D command set and write-enable sequence. | Unit Test |
-| REQ-FramDriver-004 | An accepted request shall produce exactly one completion, on the port index that made it. | Unit Test |
-| REQ-FramDriver-005 | An accepted request's call shall return status ACCEPTED before its SPI transfer completes. | Unit Test |
-| REQ-FramDriver-006 | A request violating a limit of Table 1 shall be rejected with status OUT_OF_RANGE. | Unit Test |
-| REQ-FramDriver-007 | A request made while any transfer is in progress shall be rejected with status BUSY. | Unit Test |
-| REQ-FramDriver-008 | A rejected request shall report its status before the request call returns, without a completion. | Unit Test |
-| REQ-FramDriver-009 | An SPI error after the call returns shall complete the request SPI_ERROR, no further frames. | Unit Test |
-| REQ-FramDriver-010 | A request within or after a completion shall not be rejected BUSY under REQ-007. | Unit Test |
-| REQ-FramDriver-011 | A completion shall hand back the requester's buffer with its original pointer and size. | Unit Test |
-| REQ-FramDriver-012 | At startup entry the component shall read the device ID and compare with EXPECTED_DEVICE_ID (Table 1). | Unit Test |
-| REQ-FramDriver-013 | A device ID mismatch shall be reported by a WARNING_HI event; requests shall remain accepted. | Unit Test |
-| REQ-FramDriver-014 | A startup read SPI error shall raise WARNING_HI; remaining startup reads and requests continue. | Unit Test |
-| REQ-FramDriver-015 | At startup the component shall read the status register; BP1 or BP0 set (block protect: writes to the upper part of the array are silently discarded) raises WARNING_HI. | Unit Test |
-| REQ-FramDriver-016 | The component shall emit the Table 2 events not required by REQ-013 to REQ-015. | Unit Test |
-| REQ-FramDriver-017 | The component shall report the telemetry of Table 3. | Unit Test |
-| REQ-FramDriver-018 | The component shall own no thread and no message queue. | Inspection |
-| REQ-FramDriver-021 | An SPI-driver refusal inside the call shall reject BUSY if SPI_BUSY_ERR, else SPI_ERROR. | Unit Test |
-| REQ-FramDriver-022 | A write overlapping the block-protected range shall be rejected with status WRITE_PROTECTED. | Unit Test |
-| REQ-FramDriver-023 | Data written by the component shall read back equal after an MCU reset. | Inspection (one-off bench reset test L3-1) |
+| <a id="REQ-FramDriver-001"></a>REQ-FramDriver-001 | The component shall read N bytes at a byte offset into the requester's buffer. | Unit Test |
+| <a id="REQ-FramDriver-002"></a>REQ-FramDriver-002 | The component shall write N bytes at a byte offset from the requester's buffer. | Unit Test |
+| <a id="REQ-FramDriver-003"></a>REQ-FramDriver-003 | Reads and writes shall follow datasheet 002-26764 Rev. *D command set and write-enable sequence. | Unit Test |
+| <a id="REQ-FramDriver-004"></a>REQ-FramDriver-004 | An accepted request shall produce exactly one completion, on the port index that made it. | Unit Test |
+| <a id="REQ-FramDriver-005"></a>REQ-FramDriver-005 | An accepted request's call shall return status ACCEPTED before its SPI transfer completes. | Unit Test |
+| <a id="REQ-FramDriver-006"></a>REQ-FramDriver-006 | A request violating a limit of Table 1 shall be rejected with status OUT_OF_RANGE. | Unit Test |
+| <a id="REQ-FramDriver-007"></a>REQ-FramDriver-007 | A request made while any transfer is in progress shall be rejected with status BUSY. | Unit Test |
+| <a id="REQ-FramDriver-008"></a>REQ-FramDriver-008 | A rejected request shall report its status before the request call returns, without a completion. | Unit Test |
+| <a id="REQ-FramDriver-009"></a>REQ-FramDriver-009 | An SPI error after the call returns shall complete the request SPI_ERROR, no further frames. | Unit Test |
+| <a id="REQ-FramDriver-010"></a>REQ-FramDriver-010 | A request within or after a completion shall not be rejected BUSY under REQ-007. | Unit Test |
+| <a id="REQ-FramDriver-011"></a>REQ-FramDriver-011 | A completion shall hand back the requester's buffer with its original pointer and size. | Unit Test |
+| <a id="REQ-FramDriver-012"></a>REQ-FramDriver-012 | At startup entry the component shall read the device ID and compare with EXPECTED_DEVICE_ID (Table 1). | Unit Test |
+| <a id="REQ-FramDriver-013"></a>REQ-FramDriver-013 | A device ID mismatch shall be reported by a WARNING_HI event; requests shall remain accepted. | Unit Test |
+| <a id="REQ-FramDriver-014"></a>REQ-FramDriver-014 | A startup read SPI error shall raise WARNING_HI; remaining startup reads and requests continue. | Unit Test |
+| <a id="REQ-FramDriver-015"></a>REQ-FramDriver-015 | At startup the component shall read the status register; BP1 or BP0 set (block protect: writes to the upper part of the array are silently discarded) raises WARNING_HI. | Unit Test |
+| <a id="REQ-FramDriver-016"></a>REQ-FramDriver-016 | The component shall emit the Table 2 events not required by REQ-013 to REQ-015. | Unit Test |
+| <a id="REQ-FramDriver-017"></a>REQ-FramDriver-017 | The component shall report the telemetry of Table 3. | Unit Test |
+| <a id="REQ-FramDriver-018"></a>REQ-FramDriver-018 | The component shall own no thread and no message queue. | Inspection |
+| <a id="REQ-FramDriver-021"></a>REQ-FramDriver-021 | An SPI-driver refusal inside the call shall reject BUSY if SPI_BUSY_ERR, else SPI_ERROR. | Unit Test |
+| <a id="REQ-FramDriver-022"></a>REQ-FramDriver-022 | A write overlapping the block-protected range shall be rejected with status WRITE_PROTECTED. | Unit Test |
+| <a id="REQ-FramDriver-023"></a>REQ-FramDriver-023 | Data written by the component shall read back equal after an MCU reset. | Inspection (one-off bench reset test L3-1) |
 
 Table 1 — Constants (compile-time configuration)
 
