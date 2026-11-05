@@ -229,6 +229,28 @@ sequenceDiagram
     end
 ```
 
+### Coverage targets
+
+Set in the design phase and reviewed at design review; the system-test plan
+(`CuriosityReference/FramTester/test/int/plan.json`, `coverage:` block) carries
+the same numbers and the development campaign's reports are judged against
+them before any run for record.
+
+| report | target | status |
+|---|---|---|
+| unit tests (host build) | ≥ 95 % lines; 100 % where practical | required |
+| on-target system tests | ≥ 75 % lines | required |
+| branch coverage (both) | reported, not thresholded | informational |
+
+Rationale: the host build can force every error branch of this driver, so
+unit-test line coverage is held near complete. On-target tests cannot force
+system-caused error paths (SPI NAK, bus timeout) without breaking the wiring,
+which the test-as-you-fly rule forbids; 75 % lines is the baseline there and
+those paths are acknowledged in the plan's `not_covered_ack`. Branch figures
+are informational because the compiler inserts hidden branches (the on-target
+gcovr run excludes throw/unreachable branches); the planner may raise a
+`branches_min` when the figure is meaningful.
+
 ## Unit-test list
 
 | Test | Description | Requirements |
