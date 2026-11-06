@@ -25,6 +25,10 @@ constexpr U8 FramDriverTester::SR_BP0;
 constexpr U8 FramDriverTester::SR_BP1;
 
 //! RDID reply that matches the configured EXPECTED_DEVICE_ID
+// Death-test site: FW_FILENAME_ASSERT prints "<path>/FramDriver.cpp:<line>" <arg>, FW_FILEID_ASSERT prints
+// 0x<crc>:<line> <arg> (no quotes). Match either so the tests hold under any deployment's FW_ASSERT_LEVEL.
+#define FRAM_ASSERT_SITE "(FramDriver\\.cpp|0x[0-9a-fA-F]+):[0-9]+\"?"
+
 static const U8* const EXPECTED_ID = Fram::FramConfig::EXPECTED_DEVICE_ID;  // the deployment's configured
                                                                             // identity
 //! RDID reply of another family member (-50SXE)
@@ -849,7 +853,7 @@ void FramDriverTester ::UnsolicitedCompletionAsserts() {
     // contract and is a programming error
     Fw::Buffer stray(this->m_data[0], 8);
     ASSERT_DEATH_IF_SUPPORTED(this->invoke_to_spiWriteReadComplete(0, stray, stray, Drv::SpiStatus::SPI_OK),
-                              "FramDriver\\.cpp");
+                              FRAM_ASSERT_SITE);
     this->assertFrames(0);
     this->assertCompletions(0);
     ASSERT_EVENTS_SIZE(0);
@@ -858,13 +862,13 @@ void FramDriverTester ::UnsolicitedCompletionAsserts() {
 void FramDriverTester ::StartupTwiceAsserts() {
     this->runStartup(EXPECTED_ID, 0);
     ASSERT_DEATH_IF_SUPPORTED(this->component.startup(),
-                              "FramDriver\\.cpp:[0-9]+\" 2");  // arg = COMPLETE (2)
+                              FRAM_ASSERT_SITE " 2");  // arg = COMPLETE (2)
     // While a startup read is outstanding, startup() is a programming error as
     // well
     FramDriverTester other;
     other.component.startup();
     ASSERT_DEATH_IF_SUPPORTED(other.component.startup(),
-                              "FramDriver\\.cpp:[0-9]+\" 1");  // arg = IN_PROGRESS (1)
+                              FRAM_ASSERT_SITE " 1");  // arg = IN_PROGRESS (1)
 }
 
 void FramDriverTester ::NullBufferRejected() {
@@ -884,7 +888,7 @@ void FramDriverTester ::StartupDuringClientTransferAsserts() {
     // 3)
     Fw::Buffer buffer(this->m_data[0], 8);
     ASSERT_EQ(this->requestRead(0, 0, buffer), Fram::Status::ACCEPTED);
-    ASSERT_DEATH_IF_SUPPORTED(this->component.startup(), "FramDriver\\.cpp:[0-9]+\" 3");
+    ASSERT_DEATH_IF_SUPPORTED(this->component.startup(), FRAM_ASSERT_SITE " 3");
 }
 
 void FramDriverTester ::ReentrantFromHandlerDrain() {
