@@ -75,13 +75,13 @@ Table 3 — Telemetry
 |---|---|---|
 | SetupState | enum NOT_SETUP, SETTING_UP, READY | component state |
 | CurrentOperation | enum NONE, SETUP_CAMERA, SLEEP, PING, MEMORY_STATUS, CAPTURE, DOWNLOAD, READ_REGISTER, PARAMETER_PUSH | component state (NONE when no operation is in progress) |
-| CameraMode | enum SLEEP, SD, HD | mode byte of every reply |
+| CameraMode | enum SLEEP = 0, SD = 1, HD = 2 (the reply mode byte, §7.2) | mode byte of every reply |
 | Exposure | U16 | EXPOSURE value whose Set Exposure was acknowledged; Capture reply exposure |
 | ExposureReadback | U16 | Read Register 0x3012 reply |
 | CameraUptime | U16 s | Ping reply |
 | RegisterValue | {address, value} | Read Register reply |
 | CameraValidCmds, CameraInvalidCmds | U8 | Ping / error replies |
-| MemorySlots | array[4] of {mode, exposure, uptime} | Memory Status reply |
+| MemorySlots | array[4] of {mode (same enum), exposure, uptime} | Memory Status reply |
 | LastCameraError | {command, errorType, count} | error reply |
 | Exchanges, CameraErrors, Timeouts, DiscardedBytes, MalformedReplies | U32 | component counters |
 | ImagesCaptured, LinesDownloaded, ProductsSent, QueueOverflows | U32 | component counters |
