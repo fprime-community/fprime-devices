@@ -207,7 +207,7 @@ module KissCam {
         telemetry CurrentOperation: Operation
         @ Camera mode from the mode byte of the last reply
         telemetry CameraMode: Mode
-        @ EXPOSURE value the camera acknowledged, or the exposure of the last Capture reply (steps of 89.5 us; 0 after a test-pattern capture)
+        @ EXPOSURE value the camera acknowledged, or the exposure of the last Capture reply (steps of 89.5 us; expected 0 after a test-pattern capture per datasheet §7.4.3, bench to confirm)
         telemetry Exposure: U16
         @ Sensor register 0x3012 from the last readback (steps of 89.5 us)
         telemetry ExposureReadback: U16
