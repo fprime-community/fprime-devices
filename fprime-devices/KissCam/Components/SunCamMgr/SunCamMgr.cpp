@@ -598,16 +598,22 @@ void SunCamMgr::assemble(const U8* bytes, FwSizeType size) {
     }
     // a stray run ending in a prefix of the power-on line may continue in the next buffer: keep that tail
     if (this->m_powerOnMatch > 0) {
-        const FwSizeType before = static_cast<FwSizeType>(this->m_strayCount) - this->m_powerOnMatch;
-        if (before > 0) {
-            this->discard(DiscardCause::MALFORMED, this->m_strayHead, FW_MIN(before, FRAME_HEAD_SIZE),
-                          static_cast<U32>(before));
-            ::memcpy(this->m_strayHead, POWER_ON_LINE, FW_MIN(this->m_powerOnMatch, FRAME_HEAD_SIZE));
-            this->m_strayCount = static_cast<U32>(this->m_powerOnMatch);
-        }
+        this->discardStrayBefore(this->m_powerOnMatch);
     } else {
         this->flushStray();
     }
+}
+
+void SunCamMgr::discardStrayBefore(FwSizeType keep) {
+    FW_ASSERT(static_cast<FwSizeType>(this->m_strayCount) >= keep, static_cast<FwAssertArgType>(this->m_strayCount),
+              static_cast<FwAssertArgType>(keep));
+    const FwSizeType before = static_cast<FwSizeType>(this->m_strayCount) - keep;
+    if (before > 0) {
+        this->discard(DiscardCause::MALFORMED, this->m_strayHead, FW_MIN(before, FRAME_HEAD_SIZE),
+                      static_cast<U32>(before));
+    }
+    this->m_strayCount = static_cast<U32>(keep);
+    ::memcpy(this->m_strayHead, POWER_ON_LINE, FW_MIN(keep, FRAME_HEAD_SIZE));
 }
 
 void SunCamMgr::strayByte(U8 byte) {
@@ -637,15 +643,8 @@ void SunCamMgr::flushStray() {
 
 void SunCamMgr::powerOnLineReceived() {
     // stray bytes before the line are their own discard; the line is one discard of 21 bytes (REQ-020)
-    FW_ASSERT(this->m_strayCount >= POWER_ON_LINE_SIZE, static_cast<FwAssertArgType>(this->m_strayCount));
-    const U32 before = this->m_strayCount - static_cast<U32>(POWER_ON_LINE_SIZE);
-    if (before > 0) {
-        this->discard(DiscardCause::MALFORMED, this->m_strayHead,
-                      FW_MIN(static_cast<FwSizeType>(before), FRAME_HEAD_SIZE), before);
-    }
-    this->m_strayCount = 0;
-    this->m_powerOnMatch = 0;
-    this->discard(DiscardCause::MALFORMED, POWER_ON_LINE, FRAME_HEAD_SIZE, static_cast<U32>(POWER_ON_LINE_SIZE));
+    this->discardStrayBefore(POWER_ON_LINE_SIZE);
+    this->flushStray();
     // nothing else while the camera was not set up
     if (this->m_setupState == SetupState::NOT_SETUP) {
         return;

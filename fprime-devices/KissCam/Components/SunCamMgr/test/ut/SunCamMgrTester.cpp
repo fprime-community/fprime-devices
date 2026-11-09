@@ -1038,6 +1038,19 @@ void SunCamMgrTester::testPowerOnBanner() {
     ASSERT_EVENTS_PingReply_SIZE(1);
     ASSERT_EVENTS_PingReply(0, PingType::MCU, 1, 0, 7);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_PING, 3, Fw::CmdResponse::OK);
+    // a run ending in a false prefix ("M") at the buffer end is kept until the next framed byte drops it
+    const U8 falsePrefix[2] = {0x11, 0x4D};
+    this->receive(falsePrefix, sizeof falsePrefix, Drv::ByteStreamStatus::OP_OK);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(2);
+    ASSERT_EVENTS_FrameDiscarded(1, DiscardCause::MALFORMED, 1, head(0x11, 0, 0, 0, 0, 0, 0, 0));
+    this->sendCmd_PING(0, 4, PingType::MCU);
+    this->dispatch();
+    this->pingReply(1, 0, 1, MODE_SLEEP);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(3);
+    ASSERT_EVENTS_FrameDiscarded(2, DiscardCause::MALFORMED, 1, head(0x4D, 0, 0, 0, 0, 0, 0, 0));
+    ASSERT_EVENTS_PingReply_SIZE(2);
+    ASSERT_EVENTS_CameraRestarted_SIZE(0);
+    ASSERT_CMD_RESPONSE(1, SunCamMgr::OPCODE_PING, 4, Fw::CmdResponse::OK);
 }
 
 void SunCamMgrTester::testDownloadFailedSendAndProductFull() {

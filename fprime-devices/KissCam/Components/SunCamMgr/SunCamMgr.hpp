@@ -177,6 +177,9 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     //! Account one byte of a stray run: head, count and the power-on line matcher (REQ-034)
     void strayByte(U8 byte);
 
+    //! Report the stray bytes ahead of the last `keep` (a power-on line or its prefix) as their own discard
+    void discardStrayBefore(FwSizeType keep);
+
     //! Account for a discarded frame
     void discard(DiscardCause::T cause, const U8* bytes, FwSizeType headSize, U32 totalBytes);
 
@@ -202,9 +205,8 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     //! Read the EXPOSURE parameter into m_exposureSent; false (operation ended) when it is out of range
     bool takeExposureParameter();
 
-    //! Reject CAPTURE/DOWNLOAD with a slot other than SLOT_0 while the camera is in HD (REQ-035)
-    //! HD images are named by SLOT_0 only (REQ-035): call right after a successful acceptCommand; on refusal it
-    //! answers CommandRejected(HD_SLOT) + EXECUTION_ERROR and undoes the admission, returning false
+    //! HD images are named by SLOT_0 only (REQ-035). Call right after a successful acceptCommand: on refusal it
+    //! answers CommandRejected(HD_SLOT) + EXECUTION_ERROR, undoes the admission and returns false
     bool slotAllowed(Operation::T operation, Slot::T slot);
     //! Write the ImageHeader record from the first line reply (reported = its mode byte) and announce the download
     void writeImageHeader(Mode::T reported);
