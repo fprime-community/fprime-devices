@@ -6,8 +6,8 @@
 byte-stream driver (115200 baud, 8N1, set by the deployment). It turns ground commands into the camera's seven-byte
 command frames, parses the camera's reply frames, reflects the camera's reported mode, exposure, counters and memory
 status in telemetry and events, applies the persisted camera settings (Table 1) at set-up, and delivers each image
-readout as one F Prime data product. A camera operation is one command/reply exchange or one whole `DOWNLOAD`; at most
-one operation is in progress at a time. The camera is powered by another component, so the operator calls
+readout as one F Prime data product. A camera operation is one `SETUP_CAMERA`, one Table 1 push with its follow-ups, one whole `DOWNLOAD`, or
+one other command/reply exchange; at most one operation is in progress at a time. The camera is powered by another component, so the operator calls
 `SETUP_CAMERA` once it is on; until then the component is NOT_SETUP.
 
 Device identity: KissCAM V2 Datasheet and User Manual, Revision 1.1 (April 2023). Bench unit on `/dev/ttyUSB0`
@@ -26,8 +26,8 @@ commands, uptime 38097 s — the datasheet's §7.4.1 reply format. The datasheet
 | REQ-SunCamMgr-006 | `SLEEP` and `PING` shall be accepted in NOT_SETUP and READY. | Unit Test |
 | REQ-SunCamMgr-007 | `SLEEP` shall command camera mode Sleep and return the component to NOT_SETUP. | Unit Test |
 | REQ-SunCamMgr-008 | Table 2 commands marked READY shall be rejected with a WARNING_LO event when not READY. | Unit Test |
-| REQ-SunCamMgr-009 | A command except `DOWNLOAD_ABORT` arriving during an operation shall be rejected BUSY with WARNING_LO. | Unit Test |
-| REQ-SunCamMgr-010 | A Table 1 parameter changed while READY shall be pushed when the component is idle. | Unit Test |
+| REQ-SunCamMgr-009 | A command except `DOWNLOAD_ABORT` during an operation shall be rejected BUSY with a WARNING_LO event. | Unit Test |
+| REQ-SunCamMgr-010 | Table 1 parameters changed while READY shall be pushed when no operation is in progress. | Unit Test |
 | REQ-SunCamMgr-011 | A failed parameter push shall return the component to NOT_SETUP with a WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-012 | Exposure shall be read back from register 0x3012 after every exposure push and reported. | Unit Test |
 | REQ-SunCamMgr-013 | `CAPTURE` shall send Capture with the commanded slot and test-pattern flag, reporting the returned exposure. | Unit Test |
@@ -35,17 +35,17 @@ commands, uptime 38097 s — the datasheet's §7.4.1 reply format. The datasheet
 | REQ-SunCamMgr-015 | A download shall produce one data product: Table 4 header, then one record per line. | Unit Test |
 | REQ-SunCamMgr-016 | A failed or timed-out line reply shall be retried LINE_RETRIES times before the download aborts. | Unit Test |
 | REQ-SunCamMgr-017 | An aborted download shall deliver the lines received, if a product exists, with WARNING_LO. | Unit Test |
-| REQ-SunCamMgr-018 | No reply within REPLY_TIMEOUT_TICKS `run` ticks shall end the operation with a WARNING_HI event. | Unit Test |
+| REQ-SunCamMgr-018 | No reply within REPLY_TIMEOUT_TICKS `run` ticks shall fail the exchange with a WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-019 | A camera error reply shall raise a WARNING_HI event carrying command, error type and count. | Unit Test |
-| REQ-SunCamMgr-020 | Frames outside an operation, malformed, or acknowledging another command shall be discarded, counted, WARNING_LO. | Unit Test |
-| REQ-SunCamMgr-021 | A reply mode other than the commanded mode while READY shall return to NOT_SETUP, WARNING_HI. | Unit Test |
+| REQ-SunCamMgr-020 | Out-of-operation, malformed or wrong-command frames shall be discarded and counted with a WARNING_LO event. | Unit Test |
+| REQ-SunCamMgr-021 | While READY, a reply mode ≠ commanded mode shall cause NOT_SETUP with a WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-022 | The component shall report the Table 3 telemetry from the source named for each channel. | Unit Test |
 | REQ-SunCamMgr-023 | Every command outcome and every Table 1 setting applied shall be reported by an event. | Unit Test |
 | REQ-SunCamMgr-024 | A UART send or data-product allocation failure shall end the operation with a WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-025 | Table 2 commands shall run their exchange and report the reply by event and telemetry. | Unit Test |
 | REQ-SunCamMgr-026 | `DOWNLOAD_ABORT` with no download in progress shall be rejected with a WARNING_LO event. | Unit Test |
 | REQ-SunCamMgr-027 | A CAMERA_MODE push shall be followed by an EXPOSURE push and its readback. | Unit Test |
-| REQ-SunCamMgr-028 | An exposure readback differing from the pushed value shall return to NOT_SETUP, WARNING_HI. | Unit Test |
+| REQ-SunCamMgr-028 | An exposure readback differing from the pushed value shall cause NOT_SETUP with a WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-029 | A full component queue shall drop the newest input, return its buffer, and raise WARNING_HI. | Unit Test |
 
 Table 1 — Parameters (persisted camera settings, pushed at set-up and on change)
@@ -57,7 +57,7 @@ Table 1 — Parameters (persisted camera settings, pushed at set-up and on chang
 
 Table 2 — Commands (ground operations)
 
-| Command | Arguments | Needs READY | Camera transaction(s) |
+| Command | Arguments | Needs READY | Camera exchange(s) |
 |---|---|---|---|
 | SETUP_CAMERA | — | no | set-up exchanges, in order: Ping MCU, Set Mode, Set Exposure, Read Register 0x3012, Ping MCU+sensor |
 | SLEEP | — | no | Set Mode Sleep |
@@ -81,7 +81,7 @@ Table 3 — Telemetry
 | CameraValidCmds, CameraInvalidCmds | U8 | Ping / error replies |
 | MemorySlots | array[4] of {mode, exposure, uptime} | Memory Status reply |
 | LastCameraError | {command, errorType, count} | error reply |
-| Transactions, CameraErrors, Timeouts, DiscardedBytes, MalformedReplies | U32 | component counters |
+| Exchanges, CameraErrors, Timeouts, DiscardedBytes, MalformedReplies | U32 | component counters |
 | ImagesCaptured, LinesDownloaded, ProductsSent | U32 | component counters |
 
 Table 4 — Constants and data-product records
