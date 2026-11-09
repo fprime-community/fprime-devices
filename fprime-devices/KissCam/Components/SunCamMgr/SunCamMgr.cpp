@@ -15,6 +15,11 @@ namespace KissCam {
 static_assert(KissCamConfig::REPLY_TIMEOUT_TICKS > 0, "a reply must be allowed at least one run tick");
 static_assert(KissCamConfig::TLM_PERIOD_TICKS > 0, "the periodic channel write divides the tick count");
 
+constexpr FwSizeType SunCamMgr::POWER_ON_LINE_SIZE;  // odr-used by the unit test
+const U8 SunCamMgr::POWER_ON_LINE[SunCamMgr::POWER_ON_LINE_SIZE] = {0x4d, 0x56, 0x50, 0x20, 0x43, 0x61, 0x6d,
+                                                                    0x65, 0x72, 0x61, 0x20, 0x56, 0x32, 0x20,
+                                                                    0x52, 0x53, 0x34, 0x32, 0x32, 0x0d, 0x0a};
+
 namespace {
 
 //! Payload length of the acknowledgement of each command (datasheet §7.4); Download is checked separately
@@ -27,11 +32,9 @@ bool expectedPayloadLength(U8 cmd, U16& length) {
         case SunCamMgr::CMD_SET_EXPOSURE:
             length = 0;
             return true;
-        case SunCamMgr::CMD_MEMORY_STATUS:
-            length = SunCamMgr::SLOT_COUNT * SunCamMgr::MEMORY_STATUS_RECORD_SIZE;
-            return true;
         case SunCamMgr::CMD_CAPTURE:
-            length = 2;
+            // the Capture ACK carries no payload (SDD §Behavior); the exposure used is the Exposure channel value
+            length = 0;
             return true;
         case SunCamMgr::CMD_READ_REGISTER:
             length = 4;
@@ -51,24 +54,6 @@ U8 highByte(U16 value) {
 
 U8 lowByte(U16 value) {
     return static_cast<U8>(value & 0xFF);
-}
-
-//! True when every 5-byte Memory Status record carries a Mode byte
-bool memorySlotsValid(const U8* payload) {
-    for (FwSizeType i = 0; i < SunCamMgr::SLOT_COUNT; i++) {
-        if (payload[i * SunCamMgr::MEMORY_STATUS_RECORD_SIZE] >= Mode::NUM_CONSTANTS) {
-            return false;
-        }
-    }
-    return true;
-}
-
-//! Decode the four validated 5-byte Memory Status records
-void decodeMemorySlots(const U8* payload, MemorySlots& slots) {
-    for (FwSizeType i = 0; i < SunCamMgr::SLOT_COUNT; i++) {
-        const U8* const record = &payload[i * SunCamMgr::MEMORY_STATUS_RECORD_SIZE];
-        slots[i] = MemorySlot(static_cast<Mode::T>(record[0]), readU16(&record[1]), readU16(&record[3]));
-    }
 }
 
 Setting::T settingOfStep(SetupStep::T step) {
@@ -95,11 +80,11 @@ SunCamMgr::SunCamMgr(const char* const compName)
       m_exposureSent(0),
       m_modeSent(CaptureMode::SD),
       m_pingType(PingType::MCU),
-      m_captureSlot(Slot::SLOT_1),
+      m_captureSlot(Slot::SLOT_0),
       m_captureTestPattern(TestPattern::OFF),
-      m_downloadPhase(DL_MEMORY_STATUS),
-      m_downloadSlot(Slot::SLOT_1),
-      m_downloadFirstSlot(Slot::SLOT_1),
+      m_downloadPhase(DL_FIRST_LINE),
+      m_downloadSlot(Slot::SLOT_0),
+      m_downloadFirstSlot(Slot::SLOT_0),
       m_downloadResolution(Resolution::FULL),
       m_downloadImageMode(Mode::SD),
       m_linesPerSlot(0),
@@ -112,6 +97,8 @@ SunCamMgr::SunCamMgr(const char* const compName)
       m_abortCmdSeq(0),
       m_rxLen(0),
       m_strayCount(0),
+      m_powerOnMatch(0),
+      m_exposure(0),
       m_runQueued(false),
       m_tickCount(0),
       m_modeDirty(false),
@@ -207,20 +194,14 @@ void SunCamMgr::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, const KissCam::
     }
 }
 
-void SunCamMgr::MEMORY_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (!this->acceptCommand(opCode, cmdSeq, Operation::MEMORY_STATUS, Admission::READY_ONLY)) {
-        return;
-    }
-    if (!this->sendFrame(CMD_MEMORY_STATUS, 0, 0, 0, 0)) {
-        this->exchangeFailed(FailCause::SEND_FAILED);
-    }
-}
-
 void SunCamMgr::CAPTURE_cmdHandler(FwOpcodeType opCode,
                                    U32 cmdSeq,
                                    const KissCam::Slot& slot,
                                    const KissCam::TestPattern& testPattern) {
     if (!this->acceptCommand(opCode, cmdSeq, Operation::CAPTURE, Admission::READY_ONLY)) {
+        return;
+    }
+    if (!this->slotAllowed(Operation::CAPTURE, slot.e)) {
         return;
     }
     this->m_captureSlot = slot.e;
@@ -237,15 +218,42 @@ void SunCamMgr::DOWNLOAD_cmdHandler(FwOpcodeType opCode,
     if (!this->acceptCommand(opCode, cmdSeq, Operation::DOWNLOAD, Admission::READY_ONLY)) {
         return;
     }
-    this->m_downloadPhase = DL_MEMORY_STATUS;
+    if (!this->slotAllowed(Operation::DOWNLOAD, slot.e)) {
+        return;
+    }
+    // SD and Zoom images occupy the commanded slot; an HD image occupies slots 0..3 as quadrants
+    const bool hd = (this->m_commandedMode == Mode::HD);
+    const bool preview = (resolution.e == Resolution::PREVIEW);
     this->m_downloadSlot = slot.e;
+    this->m_downloadFirstSlot = hd ? Slot::SLOT_0 : slot.e;
     this->m_downloadResolution = resolution.e;
+    this->m_linesPerSlot = preview ? PREVIEW_LINES : FULL_LINES;
+    this->m_pixelsPerLine = preview ? PREVIEW_PIXELS : FULL_PIXELS;
+    this->m_linesExpected = static_cast<U16>(this->m_linesPerSlot * (hd ? SLOT_COUNT : 1));
     this->m_linesReceived = 0;
     this->m_lineAttempt = 0;
     this->m_abortRequested = false;
-    if (!this->sendFrame(CMD_MEMORY_STATUS, 0, 0, 0, 0)) {
-        this->exchangeFailed(FailCause::SEND_FAILED);
+    const FwSizeType dataSize =
+        SIZE_OF_ImageHeader_RECORD + static_cast<FwSizeType>(this->m_linesExpected) *
+                                         SIZE_OF_ImageLine_RECORD(LINE_RECORD_PREFIX + this->m_pixelsPerLine);
+    if (this->dpGet_Image(dataSize, this->m_container) != Fw::Success::SUCCESS) {
+        this->log_WARNING_HI_ProductAllocationFailed(static_cast<U32>(dataSize));
+        this->respond(Fw::CmdResponse::EXECUTION_ERROR);
+        this->endOperation();
+        return;
     }
+    this->m_downloadPhase = DL_FIRST_LINE;
+    this->requestLine();
+}
+
+bool SunCamMgr::slotAllowed(Operation::T operation, Slot::T slot) {
+    if ((this->m_commandedMode == Mode::HD) && (slot != Slot::SLOT_0)) {
+        this->log_WARNING_LO_CommandRejected(operation, RejectCause::HD_SLOT);
+        this->respond(Fw::CmdResponse::EXECUTION_ERROR);
+        this->endOperation();
+        return false;
+    }
+    return true;
 }
 
 void SunCamMgr::DOWNLOAD_ABORT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
@@ -372,11 +380,6 @@ void SunCamMgr::SLEEP_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) {
 }
 
 void SunCamMgr::PING_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) {
-    this->countDrop(QueueInput::COMMAND);
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::BUSY);
-}
-
-void SunCamMgr::MEMORY_STATUS_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) {
     this->countDrop(QueueInput::COMMAND);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::BUSY);
 }
@@ -517,13 +520,13 @@ void SunCamMgr::exchangeFailed(FailCause::T cause) {
             this->endOperation();
             break;
         case Operation::DOWNLOAD:
-            if (cause == FailCause::MODE_MISMATCH) {
+            if ((cause == FailCause::MODE_MISMATCH) || (cause == FailCause::CAMERA_RESTART)) {
                 this->setSetupState(SetupState::NOT_SETUP);
             }
             if (cause == FailCause::SEND_FAILED) {
                 this->failDownload(DownloadFailCause::SEND_FAILED);
-            } else if (this->m_downloadPhase == DL_MEMORY_STATUS) {
-                this->failDownload(DownloadFailCause::MEMORY_STATUS_FAILED);
+            } else if (cause == FailCause::CAMERA_RESTART) {
+                this->failDownload(DownloadFailCause::CAMERA_RESTART);
             } else if (this->m_abortRequested) {
                 this->finishDownload(false);
             } else if ((cause == FailCause::MODE_MISMATCH) ||
@@ -537,10 +540,9 @@ void SunCamMgr::exchangeFailed(FailCause::T cause) {
             }
             break;
         case Operation::PING:
-        case Operation::MEMORY_STATUS:
         case Operation::CAPTURE:
         case Operation::READ_REGISTER:
-            if (cause == FailCause::MODE_MISMATCH) {
+            if ((cause == FailCause::MODE_MISMATCH) || (cause == FailCause::CAMERA_RESTART)) {
                 this->setSetupState(SetupState::NOT_SETUP);
             }
             this->respond(Fw::CmdResponse::EXECUTION_ERROR);
@@ -564,6 +566,15 @@ void SunCamMgr::assemble(const U8* bytes, FwSizeType size) {
                     this->m_strayHead[this->m_strayCount] = byte;
                 }
                 this->m_strayCount++;
+                // the camera's power-on line is unframed: recognise it in the stray run (REQ-034)
+                if (byte == POWER_ON_LINE[this->m_powerOnMatch]) {
+                    this->m_powerOnMatch++;
+                } else {
+                    this->m_powerOnMatch = (byte == POWER_ON_LINE[0]) ? 1 : 0;
+                }
+                if (this->m_powerOnMatch == POWER_ON_LINE_SIZE) {
+                    this->powerOnLineReceived();
+                }
                 continue;
             }
             this->flushStray();
@@ -592,10 +603,16 @@ void SunCamMgr::assemble(const U8* bytes, FwSizeType size) {
             // the bytes of the bad frame start a resynchronisation run
             ::memcpy(this->m_strayHead, this->m_rx, FW_MIN(this->m_rxLen, FRAME_HEAD_SIZE));
             this->m_strayCount = static_cast<U32>(this->m_rxLen);
+            this->m_powerOnMatch = 0;
             this->m_rxLen = 0;
         }
     }
-    this->flushStray();
+    // a stray run that is so far exactly a prefix of the power-on line may continue in the next buffer
+    const bool powerOnPrefix =
+        (this->m_powerOnMatch > 0) && (this->m_powerOnMatch == static_cast<FwSizeType>(this->m_strayCount));
+    if (!powerOnPrefix) {
+        this->flushStray();
+    }
 }
 
 void SunCamMgr::flushStray() {
@@ -604,6 +621,21 @@ void SunCamMgr::flushStray() {
                       FW_MIN(static_cast<FwSizeType>(this->m_strayCount), FRAME_HEAD_SIZE), this->m_strayCount);
         this->m_strayCount = 0;
     }
+    this->m_powerOnMatch = 0;
+}
+
+void SunCamMgr::powerOnLineReceived() {
+    // the run holding the line is one discard (REQ-020); nothing else while the camera was not set up
+    this->flushStray();
+    if (this->m_setupState == SetupState::NOT_SETUP) {
+        return;
+    }
+    this->log_WARNING_HI_CameraRestarted(this->m_operation);
+    this->m_commandedMode = Mode::SLEEP;
+    if (this->m_operation != Operation::NONE) {
+        this->exchangeFailed(FailCause::CAMERA_RESTART);
+    }
+    this->setSetupState(SetupState::NOT_SETUP);
 }
 
 void SunCamMgr::discardPartialFrame(DiscardCause::T cause) {
@@ -689,9 +721,6 @@ void SunCamMgr::processReply(const U8* frame, FwSizeType size) {
                ((payload[0] != this->m_pendingParams[0]) || (payload[1] != this->m_pendingParams[1]))) {
         this->discard(DiscardCause::WRONG_COMMAND, frame, headSize, bytes);
         return;
-    } else if ((cmd == CMD_MEMORY_STATUS) && !memorySlotsValid(payload)) {
-        this->discard(DiscardCause::MALFORMED, frame, headSize, bytes);
-        return;
     }
     if (modeByte >= Mode::NUM_CONSTANTS) {
         this->discard(DiscardCause::MALFORMED, frame, headSize, bytes);
@@ -750,7 +779,8 @@ void SunCamMgr::handleReply(Mode::T reported, const U8* payload, U16 length) {
         }
         case CMD_SET_EXPOSURE:
             this->log_ACTIVITY_HI_SettingApplied(Setting::EXPOSURE, this->m_exposureSent);
-            this->tlmWrite_Exposure(this->m_exposureSent);
+            this->m_exposure = this->m_exposureSent;
+            this->tlmWrite_Exposure(this->m_exposure);
             this->sendSetupStep(SetupStep::READ_EXPOSURE);
             break;
         case CMD_READ_REGISTER: {
@@ -774,30 +804,20 @@ void SunCamMgr::handleReply(Mode::T reported, const U8* payload, U16 length) {
             }
             break;
         }
-        case CMD_MEMORY_STATUS: {
-            MemorySlots slots;
-            decodeMemorySlots(payload, slots);
-            this->tlmWrite_MemorySlots(slots);
-            if (this->m_operation == Operation::MEMORY_STATUS) {
-                this->log_ACTIVITY_LO_MemoryStatusReply(slots);
-                this->respond(Fw::CmdResponse::OK);
-                this->endOperation();
-            } else {
-                this->handleMemoryStatusForDownload(slots, reported);
-            }
-            break;
-        }
         case CMD_CAPTURE: {
-            const U16 exposure = readU16(payload);
-            this->log_ACTIVITY_HI_CaptureComplete(this->m_captureSlot, this->m_captureTestPattern, exposure, reported);
+            // the ACK carries no exposure: the one used is the last the camera acknowledged (REQ-033)
+            this->log_ACTIVITY_HI_CaptureComplete(this->m_captureSlot, this->m_captureTestPattern, this->m_exposure,
+                                                  reported);
             this->m_imagesCaptured++;
             this->tlmWrite_ImagesCaptured(this->m_imagesCaptured);
-            this->tlmWrite_Exposure(exposure);
             this->respond(Fw::CmdResponse::OK);
             this->endOperation();
             break;
         }
         case CMD_DOWNLOAD:
+            if (this->m_downloadPhase == DL_FIRST_LINE) {
+                this->writeImageHeader(reported);
+            }
             this->storeLine(payload, length);
             break;
         default:
@@ -882,69 +902,19 @@ bool SunCamMgr::exposureInRange(U16 exposure) {
     return true;
 }
 
-void SunCamMgr::handleMemoryStatusForDownload(const MemorySlots& slots, Mode::T reported) {
-    if (this->m_abortRequested) {
-        this->finishDownload(false);
-        return;
-    }
-    const FwSizeType index = static_cast<FwSizeType>(this->m_downloadSlot) - 1;
-    FW_ASSERT(index < SLOT_COUNT, static_cast<FwAssertArgType>(index));
-    const Mode::T slotMode = slots[index].get_mode();
-    FwSizeType slotCount = 0;
-    if (slotMode == Mode::SD) {
-        this->m_downloadImageMode = Mode::SD;
-        this->m_downloadFirstSlot = this->m_downloadSlot;
-        slotCount = 1;
-    } else if (slotMode == Mode::HD) {
-        // one HD image spans the four slots, captured together
-        bool uptimesAgree = true;
-        bool allHd = true;
-        for (FwSizeType i = 0; i < SLOT_COUNT; i++) {
-            allHd = allHd && (slots[i].get_mode() == Mode::HD);
-            // every pair of uptimes is within the window; the 16-bit uptime wraps, so the
-            // difference is taken in both directions
-            for (FwSizeType j = i + 1; j < SLOT_COUNT; j++) {
-                const U16 ahead = static_cast<U16>(slots[j].get_uptime() - slots[i].get_uptime());
-                const U16 behind = static_cast<U16>(slots[i].get_uptime() - slots[j].get_uptime());
-                uptimesAgree = uptimesAgree && (FW_MIN(ahead, behind) <= HD_UPTIME_WINDOW);
-            }
-        }
-        if (allHd && uptimesAgree) {
-            this->m_downloadImageMode = Mode::HD;
-            this->m_downloadFirstSlot = Slot::SLOT_1;
-            slotCount = SLOT_COUNT;
-        }
-    }
-    if (slotCount == 0) {
-        this->failDownload(DownloadFailCause::NO_IMAGE);
-        return;
-    }
-    const bool preview = (this->m_downloadResolution == Resolution::PREVIEW);
-    this->m_linesPerSlot = preview ? PREVIEW_LINES : FULL_LINES;
-    this->m_pixelsPerLine = preview ? PREVIEW_PIXELS : FULL_PIXELS;
-    this->m_linesExpected = static_cast<U16>(this->m_linesPerSlot * slotCount);
-    const U16 quadrantsPerSide = (slotCount == SLOT_COUNT) ? 2 : 1;
-    const ImageHeader header(this->m_downloadFirstSlot, this->m_downloadImageMode, this->m_downloadResolution,
-                             static_cast<U16>(this->m_pixelsPerLine * quadrantsPerSide),
-                             static_cast<U16>(this->m_linesPerSlot * quadrantsPerSide), reported,
-                             this->m_linesExpected);
-    const FwSizeType dataSize =
-        SIZE_OF_ImageHeader_RECORD + static_cast<FwSizeType>(this->m_linesExpected) *
-                                         SIZE_OF_ImageLine_RECORD(LINE_RECORD_PREFIX + this->m_pixelsPerLine);
-    if (this->dpGet_Image(dataSize, this->m_container) != Fw::Success::SUCCESS) {
-        this->log_WARNING_HI_ProductAllocationFailed(static_cast<U32>(dataSize));
-        this->respond(Fw::CmdResponse::EXECUTION_ERROR);
-        this->endOperation();
-        return;
-    }
+void SunCamMgr::writeImageHeader(Mode::T reported) {
+    // the image mode is the mode byte of the first line reply; HD quadrants double both dimensions
+    const bool hd = (this->m_linesExpected > this->m_linesPerSlot);
+    const U16 sides = hd ? 2 : 1;
+    this->m_downloadImageMode = reported;
+    const ImageHeader header(this->m_downloadSlot, reported, this->m_downloadResolution,
+                             static_cast<U16>(this->m_pixelsPerLine * sides),
+                             static_cast<U16>(this->m_linesPerSlot * sides), this->m_exposure, this->m_linesExpected);
     const Fw::SerializeStatus status = this->m_container.serializeRecord_ImageHeader(header);
     FW_ASSERT(status == Fw::FW_SERIALIZE_OK, static_cast<FwAssertArgType>(status));
     this->m_downloadPhase = DL_LINES;
-    this->m_linesReceived = 0;
-    this->m_lineAttempt = 0;
-    this->log_ACTIVITY_LO_DownloadStarted(this->m_downloadSlot, this->m_downloadImageMode, this->m_downloadResolution,
+    this->log_ACTIVITY_LO_DownloadStarted(this->m_downloadSlot, reported, this->m_downloadResolution,
                                           this->m_linesExpected);
-    this->requestLine();
 }
 
 void SunCamMgr::requestLine() {
@@ -989,7 +959,7 @@ void SunCamMgr::finishDownload(bool complete) {
     if (complete) {
         this->log_ACTIVITY_HI_DownloadComplete(this->m_downloadSlot, this->m_downloadImageMode,
                                                this->m_downloadResolution, this->m_linesExpected,
-                                               static_cast<U32>(this->m_container.getDataSize()));
+                                               static_cast<U32>(this->m_linesReceived) * this->m_pixelsPerLine);
     } else {
         this->log_ACTIVITY_HI_DownloadAborted(this->m_downloadSlot, this->m_linesReceived);
     }
@@ -997,12 +967,10 @@ void SunCamMgr::finishDownload(bool complete) {
 }
 
 void SunCamMgr::closeDownload(Fw::CmdResponse::T response) {
-    if (this->m_downloadPhase == DL_LINES) {
-        // a product exists once the header was stored: the lines received so far are delivered
-        this->dpSend(this->m_container);
-        this->m_productsSent++;
-        this->tlmWrite_ProductsSent(this->m_productsSent);
-    }
+    // the product was allocated at the command: whatever was received is delivered
+    this->dpSend(this->m_container);
+    this->m_productsSent++;
+    this->tlmWrite_ProductsSent(this->m_productsSent);
     this->respond(response);
     if (this->m_abortRequested) {
         this->cmdResponse_out(this->m_abortOpCode, this->m_abortCmdSeq, Fw::CmdResponse::OK);

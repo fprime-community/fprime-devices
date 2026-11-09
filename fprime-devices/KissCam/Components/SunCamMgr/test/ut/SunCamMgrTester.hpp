@@ -32,7 +32,6 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
     static const U8 END = 0x0D;
     static const U8 CMD_PING = 0x50;
     static const U8 CMD_SET_MODE = 0x4D;
-    static const U8 CMD_MEMORY_STATUS = 0x53;
     static const U8 CMD_SET_EXPOSURE = 0x45;
     static const U8 CMD_CAPTURE = 0x43;
     static const U8 CMD_DOWNLOAD = 0x44;
@@ -45,7 +44,8 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
     // Camera mode bytes
     static const U8 MODE_SLEEP = 0;
     static const U8 MODE_SD = 1;
-    static const U8 MODE_HD = 2;
+    static const U8 MODE_ZOOM = 2;
+    static const U8 MODE_HD = 3;
 
     // Default parameter values
     static const U16 DEFAULT_EXPOSURE = 672;
@@ -70,6 +70,7 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
     void testSetupFailsEachStep();
     void testSetupReentrant();
     void testNoFramesBeforeSetup();
+    void testNoCaptureWhenNotSetup();
     void testSleepAndPingNotSetup();
     void testBusyRejection();
     void testParameterPushIdleOnly();
@@ -80,17 +81,17 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
     void testChannelsFromReplies();
     void testOutcomeEventPerCommand();
     void testDownloadFullAndPreview();
-    void testDownloadHdImage();
+    void testDownloadHdFourSlots();
     void testDownloadLineRetryAndFail();
-    void testDownloadNoImage();
     void testDownloadFailedSendAndProductFull();
     void testDownloadAbortCommanded();
     void testReplyTimeoutTicks();
     void testCameraErrorReply();
     void testMalformedAndStrayFrames();
+    void testPowerOnBanner();
     void testSplitAndCrPayloadReply();
     void testModeMismatch();
-    void testMemoryStatusAndRegister();
+    void testReadRegister();
     void testModeChangeRepushesExposure();
     void testSendAndAllocationFailure();
     void testQueueFullHooks();
@@ -148,11 +149,8 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
     //! Deliver a Read Register reply
     void registerReply(U16 address, U16 value, U8 mode = MODE_SD);
 
-    //! Deliver a Memory Status reply where every slot has (mode, exposure, uptime) from the arrays
-    void memoryStatusReply(const U8 modes[4], const U16 exposures[4], const U16 uptimes[4], U8 mode = MODE_SD);
-
-    //! Deliver a Memory Status reply where every slot holds an SD image
-    void memoryStatusAllSd(U8 mode = MODE_SD);
+    //! Deliver the camera's 21-byte power-on line, in one receive buffer or split after `split` bytes
+    void powerOnLine(FwSizeType split = 0);
 
     //! Deliver a Download line reply with pixel fill value
     void lineReply(U16 line, U16 pixels, U8 fill, U8 mode = MODE_SD);

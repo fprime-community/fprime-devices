@@ -10,6 +10,7 @@
 
 #include "Os/Mutex.hpp"
 #include "fprime-devices/KissCam/Components/SunCamMgr/SunCamMgrComponentAc.hpp"
+#include "fprime-devices/KissCam/Types/FppConstantsAc.hpp"
 
 namespace KissCam {
 
@@ -25,7 +26,6 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     static constexpr U8 ACK_ERROR = 0xFF;          //!< ACK byte of an error reply
     static constexpr U8 CMD_PING = 0x50;           //!< 'P'
     static constexpr U8 CMD_SET_MODE = 0x4D;       //!< 'M'
-    static constexpr U8 CMD_MEMORY_STATUS = 0x53;  //!< 'S'
     static constexpr U8 CMD_SET_EXPOSURE = 0x45;   //!< 'E'
     static constexpr U8 CMD_CAPTURE = 0x43;        //!< 'C'
     static constexpr U8 CMD_DOWNLOAD = 0x44;       //!< 'D'
@@ -37,16 +37,16 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     static constexpr FwSizeType REPLY_MAX_PAYLOAD = REPLY_MAX_SIZE - REPLY_HEADER_SIZE - 1;
     static constexpr FwSizeType FRAME_HEAD_SIZE = 8;  //!< bytes kept in FrameDiscarded
 
-    static constexpr U16 EXPOSURE_REGISTER = 0x3012;            //!< sensor register read back after an exposure push
-    static constexpr U16 FULL_PIXELS = 640;                     //!< pixels per full-resolution line
-    static constexpr U16 PREVIEW_PIXELS = 80;                   //!< pixels per preview line
-    static constexpr U16 LINE_ECHO_SIZE = 2;                    //!< line number echoed ahead of the pixels
-    static constexpr U16 FULL_LINES = 480;                      //!< lines of a full-resolution slot
-    static constexpr U16 PREVIEW_LINES = 60;                    //!< lines of a preview slot
-    static constexpr U16 HD_UPTIME_WINDOW = 1;                  //!< seconds between the capture uptimes of one HD image
-    static constexpr FwSizeType SLOT_COUNT = 4;                 //!< camera memory slots
-    static constexpr FwSizeType MEMORY_STATUS_RECORD_SIZE = 5;  //!< mode, exposure MSB/LSB, uptime MSB/LSB
-    static constexpr FwSizeType LINE_RECORD_PREFIX = 3;         //!< slot, line MSB, line LSB before the pixels
+    static constexpr U16 EXPOSURE_REGISTER = 0x3012;          //!< sensor register read back after an exposure push
+    static constexpr U16 FULL_PIXELS = KissCam::FULL_PIXELS;  //!< pixels per full-resolution line (SDD Table 4)
+    static constexpr U16 PREVIEW_PIXELS = KissCam::PREVIEW_PIXELS;  //!< pixels per preview line
+    static constexpr U16 LINE_ECHO_SIZE = 2;                        //!< line number echoed ahead of the pixels
+    static constexpr U16 FULL_LINES = KissCam::FULL_LINES;          //!< line requests per full-resolution slot
+    static constexpr U16 PREVIEW_LINES = KissCam::PREVIEW_LINES;    //!< line requests per preview slot
+    static constexpr FwSizeType SLOT_COUNT = 4;                     //!< camera memory slots; an HD image spans all four
+    static constexpr FwSizeType LINE_RECORD_PREFIX = 3;             //!< slot, line MSB, line LSB before the pixels
+    static constexpr FwSizeType POWER_ON_LINE_SIZE = 21;            //!< "MVP Camera V2 RS422\r\n" (SDD Table 4)
+    static const U8 POWER_ON_LINE[POWER_ON_LINE_SIZE];              //!< the camera's unframed power-on line
 
     // ----------------------------------------------------------------------
     // Component construction and destruction
@@ -90,7 +90,6 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     void SETUP_CAMERA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void SLEEP_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, const KissCam::PingType& pingType) override;
-    void MEMORY_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CAPTURE_cmdHandler(FwOpcodeType opCode,
                             U32 cmdSeq,
                             const KissCam::Slot& slot,
@@ -121,7 +120,6 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     void SETUP_CAMERA_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
     void SLEEP_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
     void PING_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
-    void MEMORY_STATUS_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
     void CAPTURE_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
     void DOWNLOAD_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
     void DOWNLOAD_ABORT_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
@@ -135,7 +133,7 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     // ----------------------------------------------------------------------
 
     //! Phase of a DOWNLOAD operation
-    enum DownloadPhase { DL_MEMORY_STATUS, DL_LINES };
+    enum DownloadPhase { DL_FIRST_LINE, DL_LINES };  //!< the ImageHeader record is written on the first line reply
 
     // ----------------------------------------------------------------------
     // Command admission and operation bookkeeping
@@ -200,8 +198,13 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     //! Read the EXPOSURE parameter into m_exposureSent; false (operation ended) when it is out of range
     bool takeExposureParameter();
 
-    //! Start the line phase from the Memory Status reply (reported = its mode byte, stored in the header)
-    void handleMemoryStatusForDownload(const MemorySlots& slots, Mode::T reported);
+    //! Reject CAPTURE/DOWNLOAD with a slot other than SLOT_0 while the camera is in HD (REQ-035)
+    bool slotAllowed(Operation::T operation, Slot::T slot);
+    //! Write the ImageHeader record from the first line reply (reported = its mode byte) and announce the download
+    void writeImageHeader(Mode::T reported);
+    //! The camera's power-on line completed in the stray bytes: discard it; while set up, the camera restarted
+    //! (REQ-034)
+    void powerOnLineReceived();
     void requestLine();
     void storeLine(const U8* payload, U16 length);
     void finishDownload(bool complete);
@@ -247,7 +250,7 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     // Download
     DownloadPhase m_downloadPhase;
     Slot::T m_downloadSlot;       //!< slot as commanded
-    Slot::T m_downloadFirstSlot;  //!< first slot read (SLOT_1 for an HD image)
+    Slot::T m_downloadFirstSlot;  //!< first slot read (SLOT_0 for an HD image)
     Resolution::T m_downloadResolution;
     Mode::T m_downloadImageMode;
     U16 m_linesPerSlot;
@@ -267,6 +270,8 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     FwSizeType m_rxLen;
     U32 m_strayCount;
     U8 m_strayHead[FRAME_HEAD_SIZE];
+    FwSizeType m_powerOnMatch;  //!< bytes of POWER_ON_LINE matched by the tail of the stray run
+    U16 m_exposure;             //!< the Exposure channel value: the last exposure the camera acknowledged
 
     // Tick
     std::atomic<bool> m_runQueued;
