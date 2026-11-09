@@ -2,8 +2,8 @@ module KissCam {
     @ Camera mode as the camera reports it in every reply (datasheet §6.2, §7.2)
     enum Mode : U8 {
         SLEEP = 0 @< Image sensor held in reset
-        SD = 1 @< Standard definition, 640 x 480, four slots
-        HD = 2 @< High definition, 1280 x 960, one image across all four slots
+        SD = 1 @< Standard definition, 640 x 480 (preview 64 x 48), four slots
+        HD = 2 @< High definition per datasheet (1280 x 960 across four slots); on our hardware a single-slot 640 x 480 image tagged HD (SDD §Not supported)
     }
     @ Capture modes the CAMERA_MODE parameter may select (Sleep is commanded with SLEEP)
     enum CaptureMode : U8 {
@@ -23,7 +23,7 @@ module KissCam {
     @ Download resolution (datasheet §7.4.6)
     enum Resolution : U8 {
         FULL = 0 @< 640 x 480, 480 lines of 640 pixels
-        PREVIEW = 1 @< 80 x 60, 60 lines of 80 pixels
+        PREVIEW = 1 @< 64 x 48, 48 lines of 64 pixels (bench; datasheet says 80 x 60)
     }
     @ Camera memory slot (datasheet §7.4.5)
     enum Slot : U8 {
@@ -70,10 +70,8 @@ module KissCam {
     @ Why a download failed before every line was received (a commanded abort is DownloadAborted)
     enum DownloadFailCause : U8 {
         LINE_FAILED = 0 @< A line failed LINE_RETRIES re-requests
-        SEND_FAILED = 1 @< The UART driver refused a Download or Memory Status frame
+        SEND_FAILED = 1 @< The UART driver refused a Download frame
         PRODUCT_FULL = 2 @< The data-product container could not hold the next record
-        MEMORY_STATUS_FAILED = 3 @< The Memory Status exchange that identifies the image failed
-        NO_IMAGE = 4 @< The slot holds no SD image, or the HD set 1-4 is not all HD with one capture uptime (REQ-032)
     }
     @ Persisted camera settings (SDD Table 1)
     enum Setting : U8 {
@@ -111,7 +109,7 @@ module KissCam {
     @ First bytes of a discarded frame, zero-padded (FrameDiscarded event)
     array FrameHead = [8] U8
 
-    @ One memory slot of the Memory Status reply (datasheet §7.4.3)
+    @ One memory slot of the Memory Status reply (datasheet §7.4.3; not implemented on our hardware, SDD §Not supported)
     struct MemorySlot {
         mode: Mode @< Camera mode when the image was taken
         exposure: U16 @< Exposure of the image; 0 = test pattern
@@ -132,12 +130,13 @@ module KissCam {
     }
     @ First record of every Image data product (SDD Table 4)
     struct ImageHeader {
-        slot: Slot @< Slot commanded; for an HD image the first quadrant is slot 1 whatever was commanded
-        imageMode: Mode @< Stored image mode from Memory Status: SD (one slot) or HD (four quadrant slots)
+        slot: Slot @< Slot commanded (every image is the one slot downloaded)
+        imageMode: Mode @< Mode byte of the first Download reply (the camera's mode when the download started)
         resolution: Resolution
-        width: U16 @< Image width in pixels: 640 / 80 (SD), 1280 / 160 (HD)
-        height: U16 @< Image height in lines: 480 / 60 (SD), 960 / 120 (HD)
-        cameraMode: Mode @< Camera mode at download time (mode byte of the Memory Status reply that started the download)
-        linesExpected: U16 @< ImageLine records in a complete product: 480 / 60 (SD), 1920 / 240 (HD, slots 1-4 in order)
+        width: U16 @< Image width in pixels: 640 (FULL) / 64 (PREVIEW)
+        height: U16 @< Image height in lines: 480 (FULL) / 48 (PREVIEW)
+        cameraMode: Mode @< Same as imageMode (kept for record compatibility; a later line whose mode byte differs is a ModeMismatch, REQ-021)
+        exposure: U16 @< The component's last pushed or read-back exposure at download time (the camera reports none)
+        linesExpected: U16 @< ImageLine records in a complete product: 480 (FULL) / 48 (PREVIEW)
     }
 }

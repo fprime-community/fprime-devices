@@ -63,17 +63,17 @@ module KissCam {
         @ First record of an Image product
         product record ImageHeader: KissCam.ImageHeader id 0
 
-        @ One image line: slot (1 byte, the HD quadrant), line number (2 bytes, MSB first), then 640 or 80 pixel bytes
+        @ One image line: slot (1 byte), line number (2 bytes, MSB first), then 640 (FULL) or 64 (PREVIEW) pixel bytes
         product record ImageLine: U8 array id 1
 
-        @ One product per image: an SD slot, or all four quadrants of an HD image
+        @ One product per image: the one slot downloaded (SD or HD mode)
         product container Image id 0 default priority KissCamConfig.IMAGE_DP_PRIORITY
 
         # ----------------------------------------------------------------------
         # Parameters (SDD Table 1) — pushed by SETUP_CAMERA and, while READY, on change
         # ----------------------------------------------------------------------
 
-        @ Capture mode pushed with Set Mode (SD: four 640x480 slots; HD: one 1280x960 image)
+        @ Capture mode pushed with Set Mode (SD or HD; on our hardware both store one 640x480 slot, SDD §Not supported)
         param CAMERA_MODE: CaptureMode default CaptureMode.SD
 
         @ Exposure pushed with Set Exposure, in steps of 89.5 us, 2..960 (camera default 672)
@@ -93,15 +93,16 @@ module KissCam {
         @ Ping the camera; reply counters and uptime go to events and telemetry. Accepted when not set up
         async command PING(pingType: PingType) hook
 
-        @ Memory Status: mode, exposure and uptime of the image in each of the four slots (needs READY)
+        @ Memory Status: mode, exposure and uptime of the image in each of the four slots (needs READY). Not implemented
+        @ on our hardware: the camera answers CameraError(MEMORY_STATUS, UNRECOGNISED_COMMAND) — the only reproducible camera error
         async command MEMORY_STATUS hook
 
-        @ Capture an image into a slot, optionally the test pattern (needs READY). In HD mode the camera
-        @ ignores the slot and the image occupies slots 1-4; CaptureComplete echoes the argument and the mode
+        @ Capture an image into a slot, optionally the test pattern (needs READY). The ACK carries 0 (bench) or
+        @ 2 (datasheet) exposure bytes; CaptureComplete echoes the slot argument and the reply mode
         async command CAPTURE(slot: Slot, testPattern: TestPattern) hook
 
-        @ Download the image in a slot into one Image data product (needs READY): Memory Status first; an SD slot
-        @ is 480 (60 preview) lines, an HD image is its four quadrant slots 1-4 in order, 1920 (240) lines
+        @ Download the image in a slot into one Image data product (needs READY): 480 (FULL) or 48 (PREVIEW) line
+        @ requests in order, no Memory Status; the header mode is the first reply's mode byte
         async command DOWNLOAD(slot: Slot, resolution: Resolution) hook
 
         @ Stop the download in progress after the pending line; the lines received are still delivered (ACTIVITY_HI)
@@ -148,14 +149,14 @@ module KissCam {
         event PingReply(pingType: PingType, validCmds: U8, invalidCmds: U8, uptime: U16) severity activity low \
             format "Camera ping {}: {} valid, {} invalid commands, uptime {} s"
 
-        @ Memory Status reply
+        @ Memory Status reply (never seen on our hardware, SDD §Not supported)
         event MemoryStatusReply(slots: MemorySlots) severity activity low format "Camera memory slots: {}"
 
-        @ Capture acknowledged
+        @ Capture acknowledged; exposure = the ACK's exposure when it carries 2 bytes, else the last pushed or read-back exposure
         event CaptureComplete(slot: Slot, testPattern: TestPattern, exposure: U16, mode: Mode) severity activity high \
             format "Captured slot {} (test pattern {}) at exposure {} in mode {}"
 
-        @ Memory Status answered, image mode known, product allocated
+        @ Product allocated and the first Download request sent; imageMode = the mode byte of the first line reply
         event DownloadStarted(slot: Slot, imageMode: Mode, resolution: Resolution, lines: U16) severity activity low \
             format "Download of slot {} ({} image) at {} started: {} lines"
 
