@@ -73,7 +73,7 @@ module KissCam {
         SEND_FAILED = 1 @< The UART driver refused a Download or Memory Status frame
         PRODUCT_FULL = 2 @< The data-product container could not hold the next record
         MEMORY_STATUS_FAILED = 3 @< The Memory Status exchange that identifies the image failed
-        NO_IMAGE = 4 @< The slot holds no SD image, or an HD image whose slots 1-4 are not all HD (REQ-032)
+        NO_IMAGE = 4 @< The slot holds no SD image, or the HD set 1-4 is not all HD with one capture uptime (REQ-032)
     }
     @ Persisted camera settings (SDD Table 1)
     enum Setting : U8 {
