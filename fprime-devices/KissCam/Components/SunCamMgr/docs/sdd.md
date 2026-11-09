@@ -81,7 +81,7 @@ Table 3 — Telemetry
 | SetupState | enum NOT_SETUP, SETTING_UP, READY | component state |
 | CurrentOperation | enum NONE, SETUP_CAMERA, SLEEP, PING, CAPTURE, DOWNLOAD, READ_REGISTER, PARAMETER_PUSH | component state (NONE when no operation is in progress) |
 | CameraMode | enum SLEEP = 0, SD = 1, ZOOM = 2, HD = 3 (the reply mode byte, §7.2) | mode byte of every reply |
-| Exposure | U16 | EXPOSURE value the camera acknowledged, or the exposure of the last Capture reply |
+| Exposure | U16 | EXPOSURE value whose Set Exposure was acknowledged (the Capture ACK carries none) |
 | ExposureReadback | U16 | Read Register 0x3012 reply |
 | CameraUptime | U16 s | Ping reply |
 | RegisterValue | {address, value} | READ_REGISTER command reply |
