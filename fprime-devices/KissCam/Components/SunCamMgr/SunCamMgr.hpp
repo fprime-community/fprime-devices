@@ -1,18 +1,52 @@
 // ======================================================================
 // \title  SunCamMgr.hpp
-// \author ubuntu
 // \brief  hpp file for SunCamMgr component implementation class
 // ======================================================================
 
 #ifndef KissCam_SunCamMgr_HPP
 #define KissCam_SunCamMgr_HPP
 
+#include <atomic>
+
+#include "Os/Mutex.hpp"
 #include "fprime-devices/KissCam/Components/SunCamMgr/SunCamMgrComponentAc.hpp"
 
 namespace KissCam {
 
+//! Manager of one KissCAM V2 camera on a UART byte stream (docs/sdd.md)
 class SunCamMgr final : public SunCamMgrComponentBase {
   public:
+    // ----------------------------------------------------------------------
+    // Protocol constants (KissCAM V2 datasheet §7)
+    // ----------------------------------------------------------------------
+
+    static constexpr U8 FRAME_START = 0x40;        //!< '@' first byte of every frame
+    static constexpr U8 FRAME_END = 0x0D;          //!< carriage return last byte of every frame
+    static constexpr U8 ACK_ERROR = 0xFF;          //!< ACK byte of an error reply
+    static constexpr U8 CMD_PING = 0x50;           //!< 'P'
+    static constexpr U8 CMD_SET_MODE = 0x4D;       //!< 'M'
+    static constexpr U8 CMD_MEMORY_STATUS = 0x53;  //!< 'S'
+    static constexpr U8 CMD_SET_EXPOSURE = 0x45;   //!< 'E'
+    static constexpr U8 CMD_CAPTURE = 0x43;        //!< 'C'
+    static constexpr U8 CMD_DOWNLOAD = 0x44;       //!< 'D'
+    static constexpr U8 CMD_READ_REGISTER = 0x52;  //!< 'R'
+
+    static constexpr FwSizeType COMMAND_FRAME_SIZE = 7;  //!< 0x40 CMD P1 P2 P3 P4 0x0D
+    static constexpr FwSizeType REPLY_HEADER_SIZE = 5;   //!< 0x40 ACK MODE LEN_MSB LEN_LSB
+    static constexpr FwSizeType REPLY_MAX_SIZE = 648;    //!< header + 642-byte payload + 0x0D
+    static constexpr FwSizeType REPLY_MAX_PAYLOAD = REPLY_MAX_SIZE - REPLY_HEADER_SIZE - 1;
+    static constexpr FwSizeType FRAME_HEAD_SIZE = 8;  //!< bytes kept in FrameDiscarded
+
+    static constexpr U16 EXPOSURE_REGISTER = 0x3012;            //!< sensor register read back after an exposure push
+    static constexpr U16 FULL_PIXELS = 640;                     //!< pixels per full-resolution line
+    static constexpr U16 PREVIEW_PIXELS = 80;                   //!< pixels per preview line
+    static constexpr U16 FULL_LINES = 480;                      //!< lines of a full-resolution slot
+    static constexpr U16 PREVIEW_LINES = 60;                    //!< lines of a preview slot
+    static constexpr U16 HD_UPTIME_WINDOW = 1;                  //!< seconds between the capture uptimes of one HD image
+    static constexpr FwSizeType SLOT_COUNT = 4;                 //!< camera memory slots
+    static constexpr FwSizeType MEMORY_STATUS_RECORD_SIZE = 5;  //!< mode, exposure MSB/LSB, uptime MSB/LSB
+    static constexpr FwSizeType LINE_RECORD_PREFIX = 3;         //!< slot, line MSB, line LSB before the pixels
+
     // ----------------------------------------------------------------------
     // Component construction and destruction
     // ----------------------------------------------------------------------
@@ -29,179 +63,217 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     // Handler implementations for typed input ports
     // ----------------------------------------------------------------------
 
-    //! Handler implementation for drvConnected
-    //!
-    //! Driver (re)connected: handler is empty, no state is kept, no probe is sent (the camera may be off)
+    //! Handler implementation for drvConnected (ignored: no state is kept about the driver)
     void drvConnected_handler(FwIndexType portNum  //!< The port number
                               ) override;
 
-    //! Handler implementation for drvReceiveIn
-    //!
-    //! Bytes from the camera, framed on the component thread (one reply arrives in several buffers).
-    //! Queue-full hook, in the driver's thread: returns the buffer and counts the drop — nothing else
+    //! Handler implementation for drvReceiveIn: frames the camera bytes and returns the buffer
     void drvReceiveIn_handler(FwIndexType portNum,  //!< The port number
                               Fw::Buffer& buffer,
                               const Drv::ByteStreamStatus& status) override;
 
-    //! Handler implementation for pingIn
-    //!
-    //! Health ping; queue-full hook only counts the drop
+    //! Handler implementation for pingIn: health ping answered on pingOut
     void pingIn_handler(FwIndexType portNum,  //!< The port number
                         U32 key               //!< Value to return to pinger
                         ) override;
 
-    //! Handler implementation for run
-    //!
-    //! Rate-group tick (10 Hz), synchronous: the handler test-and-sets the atomic "run queued" flag and, when it
-    //! was clear, invokes runInternal — at most one run message is ever on the queue
+    //! Handler implementation for run (rate-group thread): queues at most one runInternal message
     void run_handler(FwIndexType portNum,  //!< The port number
                      U32 context           //!< The call order
                      ) override;
 
-  private:
     // ----------------------------------------------------------------------
     // Handler implementations for commands
     // ----------------------------------------------------------------------
 
-    //! Handler implementation for command SETUP_CAMERA
-    //!
-    //! Ping MCU, Set Mode (CAMERA_MODE), Set Exposure (EXPOSURE), Read Register 0x3012, Ping MCU+sensor; then READY
-    void SETUP_CAMERA_cmdHandler(FwOpcodeType opCode,  //!< The opcode
-                                 U32 cmdSeq            //!< The command sequence number
-                                 ) override;
-
-    //! Handler implementation for command SLEEP
-    //!
-    //! Set Mode Sleep; the component returns to NOT_SETUP. Accepted when not set up
-    void SLEEP_cmdHandler(FwOpcodeType opCode,  //!< The opcode
-                          U32 cmdSeq            //!< The command sequence number
-                          ) override;
-
-    //! Handler implementation for command PING
-    //!
-    //! Ping the camera; reply counters and uptime go to events and telemetry. Accepted when not set up
-    void PING_cmdHandler(FwOpcodeType opCode,  //!< The opcode
-                         U32 cmdSeq,           //!< The command sequence number
-                         const KissCam::PingType& pingType) override;
-
-    //! Handler implementation for command MEMORY_STATUS
-    //!
-    //! Memory Status: mode, exposure and uptime of the image in each of the four slots (needs READY)
-    void MEMORY_STATUS_cmdHandler(FwOpcodeType opCode,  //!< The opcode
-                                  U32 cmdSeq            //!< The command sequence number
-                                  ) override;
-
-    //! Handler implementation for command CAPTURE
-    //!
-    //! Capture an image into a slot, optionally the test pattern (needs READY). In HD mode the camera
-    //! ignores the slot and the image occupies slots 1-4; CaptureComplete echoes the argument and the mode
-    void CAPTURE_cmdHandler(FwOpcodeType opCode,  //!< The opcode
-                            U32 cmdSeq,           //!< The command sequence number
+    void SETUP_CAMERA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void SLEEP_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, const KissCam::PingType& pingType) override;
+    void MEMORY_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void CAPTURE_cmdHandler(FwOpcodeType opCode,
+                            U32 cmdSeq,
                             const KissCam::Slot& slot,
                             const KissCam::TestPattern& testPattern) override;
-
-    //! Handler implementation for command DOWNLOAD
-    //!
-    //! Download the image in a slot into one Image data product (needs READY): Memory Status first; an SD slot
-    //! is 480 (60 preview) lines, an HD image is its four quadrant slots 1-4 in order, 1920 (240) lines
-    void DOWNLOAD_cmdHandler(FwOpcodeType opCode,  //!< The opcode
-                             U32 cmdSeq,           //!< The command sequence number
+    void DOWNLOAD_cmdHandler(FwOpcodeType opCode,
+                             U32 cmdSeq,
                              const KissCam::Slot& slot,
                              const KissCam::Resolution& resolution) override;
+    void DOWNLOAD_ABORT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void READ_REGISTER_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U16 address) override;
 
-    //! Handler implementation for command DOWNLOAD_ABORT
-    //!
-    //! Stop the download in progress after the pending line; the lines received are still delivered (ACTIVITY_HI)
-    void DOWNLOAD_ABORT_cmdHandler(FwOpcodeType opCode,  //!< The opcode
-                                   U32 cmdSeq            //!< The command sequence number
-                                   ) override;
-
-    //! Handler implementation for command READ_REGISTER
-    //!
-    //! Read a 16-bit image sensor register (needs READY)
-    void READ_REGISTER_cmdHandler(FwOpcodeType opCode,  //!< The opcode
-                                  U32 cmdSeq,           //!< The command sequence number
-                                  U16 address) override;
-
-  private:
     // ----------------------------------------------------------------------
     // Handler implementations for user-defined internal interfaces
     // ----------------------------------------------------------------------
 
-    //! Handler implementation for runInternal
-    //!
-    //! The tick work on the component thread: reply timeouts (KissCamConfig.REPLY_TIMEOUT_TICKS), deferred
-    //! parameter push, periodic channels. The handler clears the atomic; the queue-full hook clears it too
-    //! and counts the drop (QueueInput.RUN_TICK)
+    //! The tick on the component thread: timeouts, deferred parameter push, periodic channels
     void runInternal_internalInterfaceHandler() override;
 
-  private:
     // ----------------------------------------------------------------------
-    // Overflow hook implementations for typed input ports
+    // Queue-full hooks (caller's thread: count the drop, touch nothing else)
     // ----------------------------------------------------------------------
 
-    //! Overflow hook implementation for drvReceiveIn
-    void drvReceiveIn_overflowHook(FwIndexType portNum,  //!< The port number
+    void drvReceiveIn_overflowHook(FwIndexType portNum,
                                    Fw::Buffer& buffer,
                                    const Drv::ByteStreamStatus& status) override;
-
-    //! Overflow hook implementation for pingIn
-    void pingIn_overflowHook(FwIndexType portNum,  //!< The port number
-                             U32 key               //!< Value to return to pinger
-                             ) override;
-
-  private:
-    // ----------------------------------------------------------------------
-    // Overflow hook implementations for internal ports
-    // ----------------------------------------------------------------------
-
-    //! Overflow hook implementation for runInternal
+    void pingIn_overflowHook(FwIndexType portNum, U32 key) override;
     void runInternal_overflowHook() override;
+    void SETUP_CAMERA_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
+    void SLEEP_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
+    void PING_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
+    void MEMORY_STATUS_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
+    void CAPTURE_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
+    void DOWNLOAD_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
+    void DOWNLOAD_ABORT_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
+    void READ_REGISTER_cmdOverflowHook(FwOpcodeType opCode, U32 cmdSeq) override;
 
-  private:
+    //! Parameter change: only arms the guarded dirty flag of that parameter
+    void parameterUpdated(FwPrmIdType id) override;
+
     // ----------------------------------------------------------------------
-    // Overflow hook implementations for commands
+    // Private types
     // ----------------------------------------------------------------------
 
-    //! Overflow hook implementation for SETUP_CAMERA
-    void SETUP_CAMERA_cmdOverflowHook(FwOpcodeType opCode,  //!< The opcode
-                                      U32 cmdSeq            //!< The command sequence number
-                                      ) override;
+    //! Phase of a DOWNLOAD operation
+    enum DownloadPhase { DL_MEMORY_STATUS, DL_LINES };
 
-    //! Overflow hook implementation for SLEEP
-    void SLEEP_cmdOverflowHook(FwOpcodeType opCode,  //!< The opcode
-                               U32 cmdSeq            //!< The command sequence number
-                               ) override;
+    // ----------------------------------------------------------------------
+    // Command admission and operation bookkeeping
+    // ----------------------------------------------------------------------
 
-    //! Overflow hook implementation for PING
-    void PING_cmdOverflowHook(FwOpcodeType opCode,  //!< The opcode
-                              U32 cmdSeq            //!< The command sequence number
-                              ) override;
+    //! Admit a command: false (and the response/rejection sent) when it is refused
+    bool acceptCommand(FwOpcodeType opCode, U32 cmdSeq, Operation::T operation, bool needsReady);
 
-    //! Overflow hook implementation for MEMORY_STATUS
-    void MEMORY_STATUS_cmdOverflowHook(FwOpcodeType opCode,  //!< The opcode
-                                       U32 cmdSeq            //!< The command sequence number
-                                       ) override;
+    //! Record a drop counted by a queue-full hook
+    void countDrop(QueueInput::T source);
 
-    //! Overflow hook implementation for CAPTURE
-    void CAPTURE_cmdOverflowHook(FwOpcodeType opCode,  //!< The opcode
-                                 U32 cmdSeq            //!< The command sequence number
-                                 ) override;
+    //! Answer the pending command response and clear it
+    void respond(Fw::CmdResponse::T response);
 
-    //! Overflow hook implementation for DOWNLOAD
-    void DOWNLOAD_cmdOverflowHook(FwOpcodeType opCode,  //!< The opcode
-                                  U32 cmdSeq            //!< The command sequence number
-                                  ) override;
+    //! End the operation in progress
+    void endOperation();
 
-    //! Overflow hook implementation for DOWNLOAD_ABORT
-    void DOWNLOAD_ABORT_cmdOverflowHook(FwOpcodeType opCode,  //!< The opcode
-                                        U32 cmdSeq            //!< The command sequence number
-                                        ) override;
+    void setSetupState(SetupState::T state);
+    void setOperation(Operation::T operation);
 
-    //! Overflow hook implementation for READ_REGISTER
-    void READ_REGISTER_cmdOverflowHook(FwOpcodeType opCode,  //!< The opcode
-                                       U32 cmdSeq            //!< The command sequence number
-                                       ) override;
+    // ----------------------------------------------------------------------
+    // Camera exchanges
+    // ----------------------------------------------------------------------
+
+    //! Send one 7-byte command frame and arm the reply timeout; false when the driver refused it
+    bool sendFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4);
+
+    //! Reply timeout, 0xFF reply, mode mismatch or send failure of the exchange in progress
+    void exchangeFailed(FailCause::T cause);
+
+    //! Append received bytes to the assembler and process every complete reply
+    void assemble(const U8* bytes, FwSizeType size);
+
+    //! Flush the bytes skipped while resynchronising as one discard
+    void flushStray();
+
+    //! Account for a discarded frame
+    void discard(DiscardCause::T cause, const U8* bytes, FwSizeType headSize, U32 totalBytes);
+
+    //! Validate a complete reply against the exchange in progress, then decode it
+    void processReply(const U8* frame, FwSizeType size);
+
+    //! Decode a validated reply payload for the operation in progress
+    void handleReply(Mode::T reported, const U8* payload, U16 length);
+
+    // ----------------------------------------------------------------------
+    // Set-up, parameter push, download sequencing
+    // ----------------------------------------------------------------------
+
+    //! Send the frame of a set-up step (also used by a parameter push)
+    void sendSetupStep(SetupStep::T step);
+    void finishSetupOrPush();
+
+    //! Check EXPOSURE against EXPOSURE_MIN..EXPOSURE_MAX; emits SettingRejected when it fails
+    bool exposureInRange(U16 exposure);
+
+    void handleMemoryStatusForDownload(const MemorySlots& slots);
+    void requestLine();
+    void storeLine(const U8* payload, U16 length);
+    void finishDownload(bool complete);
+    void failDownload(DownloadFailCause::T cause);
+
+    // ----------------------------------------------------------------------
+    // Telemetry
+    // ----------------------------------------------------------------------
+
+    void writeStateChannels();
+    void writeCounterChannels();
+
+    // ----------------------------------------------------------------------
+    // Private member variables
+    // ----------------------------------------------------------------------
+
+    // Component state
+    SetupState::T m_setupState;
+    Operation::T m_operation;
+    Mode::T m_commandedMode;  //!< mode the camera was last told to be in
+    bool m_responsePending;
+    FwOpcodeType m_pendingOpCode;
+    U32 m_pendingCmdSeq;
+
+    // Exchange in progress
+    U8 m_pendingCmd;  //!< command byte awaiting a reply, 0 when none
+    U8 m_pendingParams[4];
+    U32 m_ticksWaiting;
+
+    // Set-up and parameter push
+    SetupStep::T m_setupStep;
+    U16 m_exposureSent;
+    PingType::T m_pingType;
+
+    // Capture
+    Slot::T m_captureSlot;
+    TestPattern::T m_captureTestPattern;
+
+    // Download
+    DownloadPhase m_downloadPhase;
+    Slot::T m_downloadSlot;       //!< slot as commanded
+    Slot::T m_downloadFirstSlot;  //!< first slot read (SLOT_1 for an HD image)
+    Resolution::T m_downloadResolution;
+    Mode::T m_downloadImageMode;
+    U16 m_linesPerSlot;
+    U16 m_pixelsPerLine;
+    U16 m_linesExpected;
+    U16 m_linesReceived;
+    U8 m_lineAttempt;
+    bool m_abortRequested;
+    FwOpcodeType m_abortOpCode;
+    U32 m_abortCmdSeq;
+    DpContainer m_container;
+    U8 m_lineRecord[LINE_RECORD_PREFIX + FULL_PIXELS];
+
+    // Framing
+    U8 m_txFrame[COMMAND_FRAME_SIZE];
+    U8 m_rx[REPLY_MAX_SIZE];
+    FwSizeType m_rxLen;
+    U32 m_strayCount;
+    U8 m_strayHead[FRAME_HEAD_SIZE];
+
+    // Tick
+    std::atomic<bool> m_runQueued;
+    U32 m_tickCount;
+
+    // Parameter dirty flags and queue drops (set from other threads)
+    Os::Mutex m_lock;
+    bool m_modeDirty;
+    bool m_exposureDirty;
+    U32 m_drops[QueueInput::NUM_CONSTANTS];
+
+    // Counters (Table 3)
+    U32 m_exchanges;
+    U32 m_cameraErrors;
+    U32 m_timeouts;
+    U32 m_discardedBytes;
+    U32 m_malformedReplies;
+    U32 m_imagesCaptured;
+    U32 m_linesDownloaded;
+    U32 m_productsSent;
+    U32 m_queueOverflows;
 };
 
 }  // namespace KissCam

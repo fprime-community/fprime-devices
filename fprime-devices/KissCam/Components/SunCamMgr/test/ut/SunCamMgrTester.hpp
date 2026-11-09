@@ -125,7 +125,8 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
     void initComponents();
 
     //! Dispatch every queued message
-    void dispatchAll();
+    //! Dispatch exactly `count` queued messages (doDispatch blocks on an empty queue)
+    void dispatch(U32 count = 1);
 
     //! Invoke run and dispatch the queued tick, n times
     void tick(U32 n = 1);
@@ -165,6 +166,15 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
 
     //! Send SETUP_CAMERA and dispatch it
     void sendSetup(U32 cmdSeq = 0);
+    //! Data size of an Image container: one header record and one line record (slot, line, pixels) per line
+    static FwSizeType imageDataSize(FwSizeType lines, FwSizeType pixels);
+    //! Clear the histories, remembering the last SetupState written (the channel is written on change)
+    void clearHistory();
+    //! Assert the component's set-up state: the last SetupState written, or the one before the last clear
+    void assertSetupState(SetupState::T expected);
+    //! Set a parameter through its PRM_SET command; the parameter command response is dropped from the history
+    void setExposure(U16 value);
+    void setCameraMode(CaptureMode::T mode);
 
     //! Parse the last sent product: header record then line records; returns the number of line records
     U32 checkProduct(const KissCam::ImageHeader& expectedHeader, U16 pixels, U32 expectedLines, U8 firstSlot);
@@ -188,6 +198,7 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
 
     //! Number of frames sent
     U32 m_frameCount;
+    SetupState::T m_setupStateAtClear;
 
     //! Status returned to drvSendOut
     Drv::ByteStreamStatus m_sendStatus;

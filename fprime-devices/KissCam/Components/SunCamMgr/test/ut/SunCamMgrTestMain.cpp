@@ -6,10 +6,10 @@
 
 #include "SunCamMgrTester.hpp"
 
-#define SUNCAM_TEST(name)                 \
-    TEST(SunCamMgr, name) {               \
-        KissCam::SunCamMgrTester tester;  \
-        tester.name();                    \
+#define SUNCAM_TEST(name)                \
+    TEST(SunCamMgr, name) {              \
+        KissCam::SunCamMgrTester tester; \
+        tester.name();                   \
     }
 
 SUNCAM_TEST(testSetupNominal)

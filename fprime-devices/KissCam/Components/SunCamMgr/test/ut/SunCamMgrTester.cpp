@@ -42,6 +42,7 @@ SunCamMgrTester::SunCamMgrTester()
       component("SunCamMgr"),
       m_lastFrameSize(0),
       m_frameCount(0),
+      m_setupStateAtClear(SetupState::NOT_SETUP),
       m_sendStatus(Drv::ByteStreamStatus::OP_OK),
       m_productGetStatus(Fw::Success::SUCCESS) {
     ::memset(this->m_lastFrame, 0, sizeof this->m_lastFrame);
@@ -71,12 +72,15 @@ Drv::ByteStreamStatus SunCamMgrTester::from_drvSendOut_handler(FwIndexType portN
 
 Fw::Success::T SunCamMgrTester::productGet_handler(FwDpIdType id, FwSizeType dataSize, Fw::Buffer& buffer) {
     this->pushProductGetEntry(id, dataSize);
-    const FwSizeType packetSize = Fw::DpContainer::getPacketSizeForDataSize(dataSize);
-    if ((this->m_productGetStatus != Fw::Success::SUCCESS) || (packetSize > DP_STORE_SIZE)) {
+    if (this->m_productGetStatus != Fw::Success::SUCCESS) {
         return Fw::Success::FAILURE;
     }
-    buffer.setData(this->m_dpStore);
-    buffer.setSize(packetSize);
+    // dataSize is the packet size the component asked for (DpContainer header + records + hashes)
+    EXPECT_LE(dataSize, sizeof this->m_dpStore);
+    if (dataSize > sizeof this->m_dpStore) {
+        return Fw::Success::FAILURE;
+    }
+    buffer = Fw::Buffer(this->m_dpStore, dataSize);
     return Fw::Success::SUCCESS;
 }
 
@@ -84,19 +88,16 @@ Fw::Success::T SunCamMgrTester::productGet_handler(FwDpIdType id, FwSizeType dat
 // Helpers
 // ----------------------------------------------------------------------
 
-void SunCamMgrTester::dispatchAll() {
-    // Bounded by the queue depth: every queued message is dispatched once
-    for (FwSizeType i = 0; i < TEST_INSTANCE_QUEUE_DEPTH; i++) {
-        if (this->component.doDispatch() == Fw::QueuedComponentBase::MSG_DISPATCH_EMPTY) {
-            break;
-        }
+void SunCamMgrTester::dispatch(U32 count) {
+    for (U32 i = 0; i < count; i++) {
+        ASSERT_EQ(this->component.doDispatch(), Fw::QueuedComponentBase::MSG_DISPATCH_OK);
     }
 }
 
 void SunCamMgrTester::tick(U32 n) {
     for (U32 i = 0; i < n; i++) {
         this->invoke_to_run(0, 0);
-        this->dispatchAll();
+        this->dispatch();
     }
 }
 
@@ -105,10 +106,10 @@ void SunCamMgrTester::receive(const U8* bytes, FwSizeType size, Drv::ByteStreamS
     if (size > 0) {
         ::memcpy(this->m_rxStore, bytes, size);
     }
-    Fw::Buffer buffer(this->m_rxStore, size);
+    Fw::Buffer buffer((size > 0) ? this->m_rxStore : nullptr, size);
     const U32 returned = static_cast<U32>(this->fromPortHistory_drvReceiveReturnOut->size());
     this->invoke_to_drvReceiveIn(0, buffer, status);
-    this->dispatchAll();
+    this->dispatch();
     // Every receive buffer that carried data comes back; a null notice has nothing to return
     if (size > 0) {
         ASSERT_EQ(this->fromPortHistory_drvReceiveReturnOut->size(), returned + 1);
@@ -190,9 +191,44 @@ void SunCamMgrTester::assertFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4, U32 expect
     }
 }
 
+void SunCamMgrTester::setExposure(U16 value) {
+    this->paramSet_EXPOSURE(value, Fw::ParamValid::VALID);
+    this->paramSend_EXPOSURE(0, 0);
+    ASSERT_EQ(this->cmdResponseHistory->at(this->cmdResponseHistory->size() - 1).response,
+              Fw::CmdResponse(Fw::CmdResponse::OK));
+    this->cmdResponseHistory->clear();
+}
+
+void SunCamMgrTester::setCameraMode(CaptureMode::T mode) {
+    this->paramSet_CAMERA_MODE(mode, Fw::ParamValid::VALID);
+    this->paramSend_CAMERA_MODE(0, 0);
+    ASSERT_EQ(this->cmdResponseHistory->at(this->cmdResponseHistory->size() - 1).response,
+              Fw::CmdResponse(Fw::CmdResponse::OK));
+    this->cmdResponseHistory->clear();
+}
+
+void SunCamMgrTester::clearHistory() {
+    if (this->tlmHistory_SetupState->size() > 0) {
+        this->m_setupStateAtClear = this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg.e;
+    }
+    SunCamMgrGTestBase::clearHistory();
+}
+
+void SunCamMgrTester::assertSetupState(SetupState::T expected) {
+    if (this->tlmHistory_SetupState->size() == 0) {
+        ASSERT_EQ(this->m_setupStateAtClear, expected);
+    } else {
+        ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState(expected));
+    }
+}
+
+FwSizeType SunCamMgrTester::imageDataSize(FwSizeType lines, FwSizeType pixels) {
+    return SunCamMgr::SIZE_OF_ImageHeader_RECORD + lines * SunCamMgr::SIZE_OF_ImageLine_RECORD(pixels + 3);
+}
+
 void SunCamMgrTester::sendSetup(U32 cmdSeq) {
     this->sendCmd_SETUP_CAMERA(0, cmdSeq);
-    this->dispatchAll();
+    this->dispatch();
 }
 
 void SunCamMgrTester::setupNominal(U8 modeByte, U16 exposure) {
@@ -216,7 +252,7 @@ void SunCamMgrTester::setupNominal(U8 modeByte, U16 exposure) {
 void SunCamMgrTester::startDownload(Slot slot, Resolution resolution, U32 cmdSeq) {
     const U32 base = this->m_frameCount;
     this->sendCmd_DOWNLOAD(0, cmdSeq, slot, resolution);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_MEMORY_STATUS, 0, 0, 0, 0, base + 1);
     this->memoryStatusAllSd();
     this->assertFrame(CMD_DOWNLOAD, static_cast<U8>(slot.e), static_cast<U8>(resolution.e), 0, 0, base + 2);
@@ -307,7 +343,7 @@ void SunCamMgrTester::testSetupNominal() {
     ASSERT_EVENTS_SetupFailed_SIZE(0);
     ASSERT_CMD_RESPONSE_SIZE(1);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_SETUP_CAMERA, 3, Fw::CmdResponse::OK);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::READY);
+    this->assertSetupState(SetupState::READY);
     ASSERT_EQ(this->tlmHistory_CurrentOperation->at(this->tlmHistory_CurrentOperation->size() - 1).arg,
               Operation::NONE);
     ASSERT_EQ(this->tlmHistory_CameraMode->at(this->tlmHistory_CameraMode->size() - 1).arg, Mode::SD);
@@ -365,7 +401,7 @@ void SunCamMgrTester::testSetupFailsEachStep() {
     // Out-of-range persisted EXPOSURE fails SET_EXPOSURE locally before any Set Exposure frame
     this->clearHistory();
     this->m_frameCount = 0;
-    this->paramSet_EXPOSURE(1, Fw::ParamValid::VALID);
+    this->setExposure(1);
     this->sendSetup(9);
     this->pingReply(1, 0, 1, MODE_SLEEP);
     this->ack(CMD_SET_MODE);
@@ -375,7 +411,7 @@ void SunCamMgrTester::testSetupFailsEachStep() {
     ASSERT_EVENTS_SetupFailed_SIZE(1);
     ASSERT_EVENTS_SetupFailed(0, SetupStep::SET_EXPOSURE, FailCause::OUT_OF_RANGE);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_SETUP_CAMERA, 9, Fw::CmdResponse::EXECUTION_ERROR);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
 }
 
 void SunCamMgrTester::testSetupReentrant() {
@@ -394,9 +430,8 @@ void SunCamMgrTester::testSetupReentrant() {
 void SunCamMgrTester::testNoFramesBeforeSetup() {
     this->tick(3);
     this->invoke_to_drvConnected(0);
-    this->dispatchAll();
-    this->paramSet_EXPOSURE(10, Fw::ParamValid::VALID);
-    this->paramSend_EXPOSURE(0, 0);
+    this->dispatch();
+    this->setExposure(10);
     this->tick(3);
     ASSERT_EQ(this->m_frameCount, 0u);
 
@@ -404,7 +439,7 @@ void SunCamMgrTester::testNoFramesBeforeSetup() {
     this->sendCmd_CAPTURE(0, 2, Slot::SLOT_1, TestPattern::OFF);
     this->sendCmd_DOWNLOAD(0, 3, Slot::SLOT_1, Resolution::FULL);
     this->sendCmd_READ_REGISTER(0, 4, 0x3012);
-    this->dispatchAll();
+    this->dispatch(4);
     ASSERT_EQ(this->m_frameCount, 0u);
     ASSERT_EVENTS_CommandRejected_SIZE(4);
     ASSERT_EVENTS_CommandRejected(0, Operation::MEMORY_STATUS, RejectCause::NOT_READY);
@@ -420,7 +455,7 @@ void SunCamMgrTester::testNoFramesBeforeSetup() {
 
 void SunCamMgrTester::testSleepAndPingNotSetup() {
     this->sendCmd_PING(0, 1, PingType::MCU_AND_SENSOR);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_PING, 1, 0, 0, 0, 1);
     this->pingReply(3, 1, 77, MODE_SLEEP);
     ASSERT_EVENTS_PingReply_SIZE(1);
@@ -429,38 +464,38 @@ void SunCamMgrTester::testSleepAndPingNotSetup() {
 
     // SLEEP success from NOT_SETUP
     this->sendCmd_SLEEP(0, 2);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_SET_MODE, MODE_SLEEP, 0, 0, 0, 2);
     this->ack(CMD_SET_MODE, MODE_SLEEP);
     ASSERT_EVENTS_SleepEntered_SIZE(1);
     ASSERT_CMD_RESPONSE(1, SunCamMgr::OPCODE_SLEEP, 2, Fw::CmdResponse::OK);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
 
     // SLEEP from READY, success: NOT_SETUP
     this->setupNominal();
     this->sendCmd_SLEEP(0, 3);
-    this->dispatchAll();
+    this->dispatch();
     this->ack(CMD_SET_MODE, MODE_SLEEP);
     ASSERT_EVENTS_SleepEntered_SIZE(1);
     ASSERT_EVENTS_ModeMismatch_SIZE(0);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_SLEEP, 3, Fw::CmdResponse::OK);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
 
     // SLEEP from READY, failure: still NOT_SETUP
     this->setupNominal();
     this->sendCmd_SLEEP(0, 4);
-    this->dispatchAll();
+    this->dispatch();
     this->errorReply(CMD_SET_MODE, 0x04, 1);
     ASSERT_EVENTS_SleepEntered_SIZE(0);
     ASSERT_EVENTS_CameraError_SIZE(1);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_SLEEP, 4, Fw::CmdResponse::EXECUTION_ERROR);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
 }
 
 void SunCamMgrTester::testBusyRejection() {
     this->setupNominal();
     this->sendCmd_MEMORY_STATUS(0, 1);
-    this->dispatchAll();
+    this->dispatch();
     ASSERT_EQ(this->m_frameCount, 6u);
 
     this->sendCmd_SETUP_CAMERA(0, 10);
@@ -470,10 +505,11 @@ void SunCamMgrTester::testBusyRejection() {
     this->sendCmd_CAPTURE(0, 14, Slot::SLOT_2, TestPattern::ON);
     this->sendCmd_DOWNLOAD(0, 15, Slot::SLOT_1, Resolution::FULL);
     this->sendCmd_READ_REGISTER(0, 16, 0x3012);
-    this->dispatchAll();
+    this->dispatch(7);
     ASSERT_EVENTS_CommandRejected_SIZE(7);
-    const Operation::T ops[7] = {Operation::SETUP_CAMERA, Operation::SLEEP,    Operation::PING,         Operation::MEMORY_STATUS,
-                                 Operation::CAPTURE,      Operation::DOWNLOAD, Operation::READ_REGISTER};
+    const Operation::T ops[7] = {Operation::SETUP_CAMERA,  Operation::SLEEP,   Operation::PING,
+                                 Operation::MEMORY_STATUS, Operation::CAPTURE, Operation::DOWNLOAD,
+                                 Operation::READ_REGISTER};
     const FwOpcodeType opcodes[7] = {SunCamMgr::OPCODE_SETUP_CAMERA, SunCamMgr::OPCODE_SLEEP,
                                      SunCamMgr::OPCODE_PING,         SunCamMgr::OPCODE_MEMORY_STATUS,
                                      SunCamMgr::OPCODE_CAPTURE,      SunCamMgr::OPCODE_DOWNLOAD,
@@ -484,7 +520,7 @@ void SunCamMgrTester::testBusyRejection() {
     }
     // DOWNLOAD_ABORT during a non-download operation: NO_DOWNLOAD, not BUSY
     this->sendCmd_DOWNLOAD_ABORT(0, 17);
-    this->dispatchAll();
+    this->dispatch();
     ASSERT_EVENTS_CommandRejected_SIZE(8);
     ASSERT_EVENTS_CommandRejected(7, Operation::DOWNLOAD_ABORT, RejectCause::NO_DOWNLOAD);
     ASSERT_CMD_RESPONSE(7, SunCamMgr::OPCODE_DOWNLOAD_ABORT, 17, Fw::CmdResponse::EXECUTION_ERROR);
@@ -496,8 +532,7 @@ void SunCamMgrTester::testBusyRejection() {
 
 void SunCamMgrTester::testParameterPushIdleOnly() {
     // changed while NOT_SETUP: never pushed on its own, applied by SETUP_CAMERA
-    this->paramSet_EXPOSURE(100, Fw::ParamValid::VALID);
-    this->paramSend_EXPOSURE(0, 0);
+    this->setExposure(100);
     this->tick(3);
     ASSERT_EQ(this->m_frameCount, 0u);
     this->setupNominal(MODE_SD, 100);
@@ -506,9 +541,8 @@ void SunCamMgrTester::testParameterPushIdleOnly() {
 
     // changed during an operation: deferred to the next idle tick
     this->sendCmd_PING(0, 1, PingType::MCU);
-    this->dispatchAll();
-    this->paramSet_EXPOSURE(200, Fw::ParamValid::VALID);
-    this->paramSend_EXPOSURE(0, 0);
+    this->dispatch();
+    this->setExposure(200);
     this->tick(2);
     ASSERT_EQ(this->m_frameCount, 6u);
     this->pingReply(1, 0, 1);
@@ -525,7 +559,7 @@ void SunCamMgrTester::testParameterPushIdleOnly() {
     ASSERT_EVENTS_ExposureReadback(0, 200, 200);
     ASSERT_EQ(this->tlmHistory_CurrentOperation->at(this->tlmHistory_CurrentOperation->size() - 1).arg,
               Operation::NONE);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::READY);
+    this->assertSetupState(SetupState::READY);
     this->tick(3);
     ASSERT_EQ(this->m_frameCount, 8u);
 }
@@ -533,29 +567,27 @@ void SunCamMgrTester::testParameterPushIdleOnly() {
 void SunCamMgrTester::testParameterPushFailure() {
     // timeout
     this->setupNominal();
-    this->paramSet_EXPOSURE(300, Fw::ParamValid::VALID);
-    this->paramSend_EXPOSURE(0, 0);
+    this->setExposure(300);
     this->tick();
     this->assertFrame(CMD_SET_EXPOSURE, 0x01, 0x2C, 0, 0, 6);
     this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS);
     ASSERT_EVENTS_ReplyTimeout(0, Operation::PARAMETER_PUSH, CMD_SET_EXPOSURE);
     ASSERT_EVENTS_SettingPushFailed_SIZE(1);
     ASSERT_EVENTS_SettingPushFailed(0, Setting::EXPOSURE, FailCause::TIMEOUT);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
     this->tick(3);
     ASSERT_EQ(this->m_frameCount, 6u);
 
     // camera error on the mode push
     this->setupNominal(MODE_SD, 300);
-    this->paramSet_CAMERA_MODE(CaptureMode::HD, Fw::ParamValid::VALID);
-    this->paramSend_CAMERA_MODE(0, 0);
+    this->setCameraMode(CaptureMode::HD);
     this->tick();
     this->assertFrame(CMD_SET_MODE, MODE_HD, 0, 0, 0, 12);
     this->errorReply(CMD_SET_MODE, 0x04, 2, MODE_SD);
     ASSERT_EVENTS_CameraError(0, Operation::PARAMETER_PUSH, CMD_SET_MODE, ErrorType::SENSOR_PROBLEM, 2);
     ASSERT_EVENTS_SettingPushFailed_SIZE(1);
     ASSERT_EVENTS_SettingPushFailed(0, Setting::CAMERA_MODE, FailCause::CAMERA_ERROR);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
     ASSERT_CMD_RESPONSE_SIZE(0);
 }
 
@@ -574,20 +606,19 @@ void SunCamMgrTester::testExposureReadbackMismatch() {
     ASSERT_EQ(this->m_frameCount, 4u);
     // on a push
     this->setupNominal();
-    this->paramSet_EXPOSURE(50, Fw::ParamValid::VALID);
-    this->paramSend_EXPOSURE(0, 0);
+    this->setExposure(50);
     this->tick();
     this->ack(CMD_SET_EXPOSURE);
     this->registerReply(EXPOSURE_REGISTER, 49);
     ASSERT_EVENTS_ExposureReadback(0, 50, 49);
     ASSERT_EVENTS_SettingPushFailed(0, Setting::EXPOSURE, FailCause::EXPOSURE_MISMATCH);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
 }
 
 void SunCamMgrTester::testCaptureReportsExposure() {
     this->setupNominal();
     this->sendCmd_CAPTURE(0, 1, Slot::SLOT_3, TestPattern::ON);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_CAPTURE, 3, 1, 0, 0, 6);
     const U8 payload[2] = {0x00, 0x0A};
     this->reply(CMD_CAPTURE, MODE_SD, payload, sizeof payload);
@@ -600,50 +631,48 @@ void SunCamMgrTester::testCaptureReportsExposure() {
 
 void SunCamMgrTester::testCommandFrameBytes() {
     this->sendCmd_PING(0, 0, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_PING, 0x00, 0, 0, 0, 1);
     this->pingReply(1, 0, 1, MODE_SLEEP);
     this->sendCmd_SLEEP(0, 0);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_SET_MODE, 0x00, 0, 0, 0, 2);
     this->ack(CMD_SET_MODE, MODE_SLEEP);
-    this->paramSet_CAMERA_MODE(CaptureMode::HD, Fw::ParamValid::VALID);
-    this->paramSet_EXPOSURE(0x1234 & 0x03FF, Fw::ParamValid::VALID);  // 0x0234 = 564
-    this->setupNominal(MODE_HD, 0x0234);                               // Set Mode 02, Set Exposure 02 34, Read 30 12
+    this->setCameraMode(CaptureMode::HD);
+    this->setExposure(0x1234 & 0x03FF);   // 0x0234 = 564
+    this->setupNominal(MODE_HD, 0x0234);  // Set Mode 02, Set Exposure 02 34, Read 30 12
     this->sendCmd_MEMORY_STATUS(0, 0);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_MEMORY_STATUS, 0, 0, 0, 0, 8);
     this->memoryStatusAllSd(MODE_HD);
     this->sendCmd_CAPTURE(0, 0, Slot::SLOT_4, TestPattern::OFF);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_CAPTURE, 0x04, 0x00, 0, 0, 9);
     const U8 payload[2] = {0x02, 0x34};
     this->reply(CMD_CAPTURE, MODE_HD, payload, sizeof payload);
     this->sendCmd_READ_REGISTER(0, 0, 0xBEEF);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_READ_REGISTER, 0xBE, 0xEF, 0, 0, 10);
     this->registerReply(0xBEEF, 1, MODE_HD);
     this->sendCmd_DOWNLOAD(0, 0, Slot::SLOT_2, Resolution::PREVIEW);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_MEMORY_STATUS, 0, 0, 0, 0, 11);
     this->memoryStatusAllSd(MODE_HD);
     this->assertFrame(CMD_DOWNLOAD, 0x02, 0x01, 0x00, 0x00, 12);
     this->lineReply(0, PREVIEW_PIXELS, 0, MODE_HD);
     this->assertFrame(CMD_DOWNLOAD, 0x02, 0x01, 0x00, 0x01, 13);
     // line number is 16-bit MSB first
-    for (U16 line = 1; line < 0x0101; line++) {
-        if (line == PREVIEW_LINES) {
-            break;
-        }
+    for (U16 line = 1; line < PREVIEW_LINES - 1; line++) {
         this->lineReply(line, PREVIEW_PIXELS, static_cast<U8>(line), MODE_HD);
     }
+    this->assertFrame(CMD_DOWNLOAD, 0x02, 0x01, 0x00, PREVIEW_LINES - 1, 12 + PREVIEW_LINES - 1);
     this->sendCmd_DOWNLOAD_ABORT(0, 0);
-    this->dispatchAll();
+    this->dispatch();
     this->lineReply(PREVIEW_LINES - 1, PREVIEW_PIXELS, 0, MODE_HD);
-    ASSERT_EVENTS_DownloadComplete_SIZE(1);
+    ASSERT_EVENTS_DownloadAborted_SIZE(1);
     // a full-resolution line request past 255 carries the MSB
     this->sendCmd_DOWNLOAD(0, 0, Slot::SLOT_1, Resolution::FULL);
-    this->dispatchAll();
+    this->dispatch();
     this->memoryStatusAllSd(MODE_HD);
     for (U16 line = 0; line < 0x0100; line++) {
         this->lineReply(line, FULL_PIXELS, static_cast<U8>(line), MODE_HD);
@@ -654,7 +683,7 @@ void SunCamMgrTester::testCommandFrameBytes() {
 void SunCamMgrTester::testChannelsFromReplies() {
     this->setupNominal(MODE_SD);
     this->sendCmd_PING(0, 0, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     this->pingReply(12, 3, 0xABCD, MODE_SD);
     ASSERT_TLM_CameraUptime(0, 0xABCD);
     ASSERT_TLM_CameraValidCmds(0, 12);
@@ -662,7 +691,7 @@ void SunCamMgrTester::testChannelsFromReplies() {
     ASSERT_TLM_CameraMode(0, Mode::SD);
 
     this->sendCmd_MEMORY_STATUS(0, 0);
-    this->dispatchAll();
+    this->dispatch();
     const U8 modes[4] = {MODE_SD, MODE_HD, MODE_SLEEP, MODE_SD};
     const U16 exposures[4] = {10, 672, 0, 960};
     const U16 uptimes[4] = {1, 2, 3, 0xFFFF};
@@ -678,44 +707,44 @@ void SunCamMgrTester::testChannelsFromReplies() {
     ASSERT_EVENTS_MemoryStatusReply(0, slots);
 
     this->sendCmd_READ_REGISTER(0, 0, 0x3012);
-    this->dispatchAll();
+    this->dispatch();
     this->registerReply(0x3012, 0x0123);
     ASSERT_TLM_RegisterValue_SIZE(1);
     ASSERT_TLM_RegisterValue(0, RegisterValue(0x3012, 0x0123));
 
     this->sendCmd_READ_REGISTER(0, 0, 0x3000);
-    this->dispatchAll();
+    this->dispatch();
     this->errorReply(CMD_READ_REGISTER, 0x02, 9);
     ASSERT_TLM_LastCameraError_SIZE(1);
     ASSERT_TLM_LastCameraError(0, CameraErrorInfo(CMD_READ_REGISTER, ErrorType::INVALID_PARAMETER, 9));
     ASSERT_TLM_CameraInvalidCmds(1, 9);
     ASSERT_EQ(this->tlmHistory_CameraErrors->at(this->tlmHistory_CameraErrors->size() - 1).arg, 1u);
-    ASSERT_EQ(this->tlmHistory_Exchanges->at(this->tlmHistory_Exchanges->size() - 1).arg, 4u);
+    ASSERT_EQ(this->tlmHistory_Exchanges->at(this->tlmHistory_Exchanges->size() - 1).arg, 9u);
 }
 
 void SunCamMgrTester::testOutcomeEventPerCommand() {
     // OK outcomes
     this->setupNominal();  // SetupComplete checked in testSetupNominal
     this->sendCmd_PING(0, 1, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     this->pingReply(1, 2, 3);
     ASSERT_EVENTS_PingReply(0, PingType::MCU, 1, 2, 3);
     this->sendCmd_MEMORY_STATUS(0, 2);
-    this->dispatchAll();
+    this->dispatch();
     this->memoryStatusAllSd();
     ASSERT_EVENTS_MemoryStatusReply_SIZE(1);
     this->sendCmd_CAPTURE(0, 3, Slot::SLOT_1, TestPattern::OFF);
-    this->dispatchAll();
+    this->dispatch();
     const U8 payload[2] = {0x02, 0xA0};
     this->reply(CMD_CAPTURE, MODE_SD, payload, 2);
     ASSERT_EVENTS_CaptureComplete(0, Slot::SLOT_1, TestPattern::OFF, DEFAULT_EXPOSURE, Mode::SD);
     this->sendCmd_READ_REGISTER(0, 4, 0x3012);
-    this->dispatchAll();
+    this->dispatch();
     this->registerReply(0x3012, DEFAULT_EXPOSURE);
     ASSERT_EVENTS_RegisterRead_SIZE(1);
     ASSERT_EVENTS_RegisterRead(0, 0x3012, DEFAULT_EXPOSURE);
     this->sendCmd_SLEEP(0, 5);
-    this->dispatchAll();
+    this->dispatch();
     this->ack(CMD_SET_MODE, MODE_SLEEP);
     ASSERT_EVENTS_SleepEntered_SIZE(1);
     ASSERT_CMD_RESPONSE_SIZE(5);
@@ -727,7 +756,7 @@ void SunCamMgrTester::testOutcomeEventPerCommand() {
     this->clearHistory();
     this->sendCmd_CAPTURE(0, 6, Slot::SLOT_1, TestPattern::OFF);
     this->sendCmd_DOWNLOAD_ABORT(0, 7);
-    this->dispatchAll();
+    this->dispatch(2);
     ASSERT_EVENTS_CommandRejected_SIZE(2);
     ASSERT_EVENTS_CommandRejected(0, Operation::CAPTURE, RejectCause::NOT_READY);
     ASSERT_EVENTS_CommandRejected(1, Operation::DOWNLOAD_ABORT, RejectCause::NO_DOWNLOAD);
@@ -740,9 +769,7 @@ void SunCamMgrTester::testDownloadFullAndPreview() {
     // FULL
     this->startDownload(Slot::SLOT_2, Resolution::FULL, 1);
     ASSERT_PRODUCT_GET_SIZE(1);
-    ASSERT_PRODUCT_GET(0, 0,
-                       SunCamMgr::SIZE_OF_ImageHeader_RECORD +
-                           FULL_LINES * SunCamMgr::SIZE_OF_ImageLine_RECORD(FULL_PIXELS + 3));
+    ASSERT_PRODUCT_GET(0, 0, Fw::DpContainer::getPacketSizeForDataSize(imageDataSize(FULL_LINES, FULL_PIXELS)));
     ASSERT_EVENTS_DownloadStarted_SIZE(1);
     ASSERT_EVENTS_DownloadStarted(0, Slot::SLOT_2, Mode::SD, Resolution::FULL, FULL_LINES);
     for (U16 line = 0; line < FULL_LINES; line++) {
@@ -755,7 +782,7 @@ void SunCamMgrTester::testDownloadFullAndPreview() {
     const ImageHeader fullHeader(Slot::SLOT_2, Mode::SD, Resolution::FULL, 1280 / 2, 960 / 2, Mode::SD, FULL_LINES);
     ASSERT_EQ(this->checkProduct(fullHeader, FULL_PIXELS, FULL_LINES, 2), FULL_LINES);
     ASSERT_EVENTS_DownloadComplete(0, Slot::SLOT_2, Mode::SD, Resolution::FULL, FULL_LINES,
-                                   static_cast<U32>(this->productGetHistory->at(0).size));
+                                   static_cast<U32>(imageDataSize(FULL_LINES, FULL_PIXELS)));
     ASSERT_TLM_ProductsSent(0, 1);
     ASSERT_EQ(this->tlmHistory_LinesDownloaded->at(this->tlmHistory_LinesDownloaded->size() - 1).arg, FULL_LINES);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 1, Fw::CmdResponse::OK);
@@ -766,9 +793,7 @@ void SunCamMgrTester::testDownloadFullAndPreview() {
     this->clearHistory();
     this->m_frameCount = 0;
     this->startDownload(Slot::SLOT_4, Resolution::PREVIEW, 2);
-    ASSERT_PRODUCT_GET(0, 0,
-                       SunCamMgr::SIZE_OF_ImageHeader_RECORD +
-                           PREVIEW_LINES * SunCamMgr::SIZE_OF_ImageLine_RECORD(PREVIEW_PIXELS + 3));
+    ASSERT_PRODUCT_GET(0, 0, Fw::DpContainer::getPacketSizeForDataSize(imageDataSize(PREVIEW_LINES, PREVIEW_PIXELS)));
     for (U16 line = 0; line < PREVIEW_LINES; line++) {
         this->assertFrame(CMD_DOWNLOAD, 4, 1, 0, static_cast<U8>(line), 2 + line);
         this->lineReply(line, PREVIEW_PIXELS, static_cast<U8>(line));
@@ -781,19 +806,17 @@ void SunCamMgrTester::testDownloadFullAndPreview() {
 }
 
 void SunCamMgrTester::testDownloadHdImage() {
-    this->paramSet_CAMERA_MODE(CaptureMode::HD, Fw::ParamValid::VALID);
+    this->setCameraMode(CaptureMode::HD);
     this->setupNominal(MODE_HD);
     this->sendCmd_DOWNLOAD(0, 1, Slot::SLOT_3, Resolution::PREVIEW);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_MEMORY_STATUS, 0, 0, 0, 0, 6);
     const U8 modes[4] = {MODE_HD, MODE_HD, MODE_HD, MODE_HD};
     const U16 exposures[4] = {10, 10, 10, 10};
-    const U16 uptimes[4] = {100, 101, 99, 100};  // within +-1 s
+    const U16 uptimes[4] = {100, 101, 100, 101};  // within 1 s of each other
     this->memoryStatusReply(modes, exposures, uptimes, MODE_HD);
     const U16 hdLines = 4 * PREVIEW_LINES;
-    ASSERT_PRODUCT_GET(0, 0,
-                       SunCamMgr::SIZE_OF_ImageHeader_RECORD +
-                           hdLines * SunCamMgr::SIZE_OF_ImageLine_RECORD(PREVIEW_PIXELS + 3));
+    ASSERT_PRODUCT_GET(0, 0, Fw::DpContainer::getPacketSizeForDataSize(imageDataSize(hdLines, PREVIEW_PIXELS)));
     ASSERT_EVENTS_DownloadStarted(0, Slot::SLOT_3, Mode::HD, Resolution::PREVIEW, hdLines);
     for (U16 i = 0; i < hdLines; i++) {
         const U8 slot = static_cast<U8>(1 + i / PREVIEW_LINES);
@@ -804,19 +827,17 @@ void SunCamMgrTester::testDownloadHdImage() {
     const ImageHeader header(Slot::SLOT_1, Mode::HD, Resolution::PREVIEW, 160, 120, Mode::HD, hdLines);
     ASSERT_EQ(this->checkProduct(header, PREVIEW_PIXELS, hdLines, 1), hdLines);
     ASSERT_EVENTS_DownloadComplete(0, Slot::SLOT_3, Mode::HD, Resolution::PREVIEW, hdLines,
-                                   static_cast<U32>(this->productGetHistory->at(0).size));
+                                   static_cast<U32>(imageDataSize(hdLines, PREVIEW_PIXELS)));
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 1, Fw::CmdResponse::OK);
     // FULL HD header geometry and line count
     this->clearHistory();
     this->sendCmd_DOWNLOAD(0, 2, Slot::SLOT_1, Resolution::FULL);
-    this->dispatchAll();
+    this->dispatch();
     this->memoryStatusReply(modes, exposures, uptimes, MODE_HD);
     ASSERT_EVENTS_DownloadStarted(0, Slot::SLOT_1, Mode::HD, Resolution::FULL, 4 * FULL_LINES);
-    ASSERT_PRODUCT_GET(0, 0,
-                       SunCamMgr::SIZE_OF_ImageHeader_RECORD +
-                           4 * FULL_LINES * SunCamMgr::SIZE_OF_ImageLine_RECORD(FULL_PIXELS + 3));
+    ASSERT_PRODUCT_GET(0, 0, Fw::DpContainer::getPacketSizeForDataSize(imageDataSize(4 * FULL_LINES, FULL_PIXELS)));
     this->sendCmd_DOWNLOAD_ABORT(0, 3);
-    this->dispatchAll();
+    this->dispatch();
     this->lineReply(0, FULL_PIXELS, 0, MODE_HD);
     const ImageHeader fullHeader(Slot::SLOT_1, Mode::HD, Resolution::FULL, 1280, 960, Mode::HD, 4 * FULL_LINES);
     ASSERT_EQ(this->checkProduct(fullHeader, FULL_PIXELS, 1, 1), 1u);
@@ -845,18 +866,18 @@ void SunCamMgrTester::testDownloadLineRetryAndFail() {
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 1, Fw::CmdResponse::EXECUTION_ERROR);
     const ImageHeader header(Slot::SLOT_1, Mode::SD, Resolution::PREVIEW, 80, 60, Mode::SD, PREVIEW_LINES);
     ASSERT_EQ(this->checkProduct(header, PREVIEW_PIXELS, 2, 1), 2u);
-    ASSERT_TLM_ProductsSent(0, 1);
+    ASSERT_EQ(this->tlmHistory_ProductsSent->at(this->tlmHistory_ProductsSent->size() - 1).arg, 1u);
     ASSERT_EQ(this->m_frameCount, 9u + KissCamConfig::LINE_RETRIES);
     ASSERT_EQ(this->tlmHistory_CurrentOperation->at(this->tlmHistory_CurrentOperation->size() - 1).arg,
               Operation::NONE);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::READY);
+    this->assertSetupState(SetupState::READY);
 }
 
 void SunCamMgrTester::testDownloadNoImage() {
     this->setupNominal();
     // slot mode SLEEP
     this->sendCmd_DOWNLOAD(0, 1, Slot::SLOT_2, Resolution::FULL);
-    this->dispatchAll();
+    this->dispatch();
     const U8 sleepModes[4] = {MODE_SD, MODE_SLEEP, MODE_SD, MODE_SD};
     const U16 exposures[4] = {1, 1, 1, 1};
     const U16 uptimes[4] = {5, 5, 5, 5};
@@ -867,7 +888,7 @@ void SunCamMgrTester::testDownloadNoImage() {
     // one quadrant SD
     const U8 mixedModes[4] = {MODE_HD, MODE_HD, MODE_SD, MODE_HD};
     this->sendCmd_DOWNLOAD(0, 2, Slot::SLOT_1, Resolution::FULL);
-    this->dispatchAll();
+    this->dispatch();
     this->memoryStatusReply(mixedModes, exposures, uptimes);
     ASSERT_EVENTS_DownloadFailed_SIZE(2);
     ASSERT_EVENTS_DownloadFailed(1, Slot::SLOT_1, 0, DownloadFailCause::NO_IMAGE);
@@ -875,7 +896,7 @@ void SunCamMgrTester::testDownloadNoImage() {
     const U8 hdModes[4] = {MODE_HD, MODE_HD, MODE_HD, MODE_HD};
     const U16 skewed[4] = {100, 100, 102, 100};
     this->sendCmd_DOWNLOAD(0, 3, Slot::SLOT_4, Resolution::PREVIEW);
-    this->dispatchAll();
+    this->dispatch();
     this->memoryStatusReply(hdModes, exposures, skewed);
     ASSERT_EVENTS_DownloadFailed_SIZE(3);
     ASSERT_EVENTS_DownloadFailed(2, Slot::SLOT_4, 0, DownloadFailCause::NO_IMAGE);
@@ -884,14 +905,14 @@ void SunCamMgrTester::testDownloadNoImage() {
     ASSERT_PRODUCT_SEND_SIZE(0);
     ASSERT_EVENTS_DownloadStarted_SIZE(0);
     ASSERT_EQ(this->m_frameCount, 8u);  // 5 set-up + 3 Memory Status, no Download frame
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::READY);
+    this->assertSetupState(SetupState::READY);
 }
 
 void SunCamMgrTester::testDownloadFailedSendAndProductFull() {
     this->setupNominal();
     // Download frame refused by the driver
     this->sendCmd_DOWNLOAD(0, 1, Slot::SLOT_1, Resolution::PREVIEW);
-    this->dispatchAll();
+    this->dispatch();
     this->m_sendStatus = Drv::ByteStreamStatus::OTHER_ERROR;
     this->memoryStatusAllSd();
     this->m_sendStatus = Drv::ByteStreamStatus::OP_OK;
@@ -906,7 +927,7 @@ void SunCamMgrTester::testDownloadFailedSendAndProductFull() {
 
     // Memory Status failure
     this->sendCmd_DOWNLOAD(0, 2, Slot::SLOT_1, Resolution::PREVIEW);
-    this->dispatchAll();
+    this->dispatch();
     this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS);
     ASSERT_EVENTS_DownloadFailed_SIZE(1);
     ASSERT_EVENTS_DownloadFailed(0, Slot::SLOT_1, 0, DownloadFailCause::MEMORY_STATUS_FAILED);
@@ -915,20 +936,26 @@ void SunCamMgrTester::testDownloadFailedSendAndProductFull() {
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 2, Fw::CmdResponse::EXECUTION_ERROR);
     this->clearHistory();
 
-    // Container full: a line reply longer than requested does not fit (parsed by length, declared 642 for a preview)
+    // Container full: lines longer than requested (parsed by length) exhaust the preview-sized container
     this->startDownload(Slot::SLOT_1, Resolution::PREVIEW, 3);
-    this->lineReply(0, PREVIEW_PIXELS, 0);
-    this->lineReply(1, FULL_PIXELS, 1);  // oversize line: record does not fit the preview-sized container
+    const FwSizeType lineCapacity =
+        imageDataSize(PREVIEW_LINES, PREVIEW_PIXELS) - SunCamMgr::SIZE_OF_ImageHeader_RECORD;
+    const U16 oversizeLinesThatFit =
+        static_cast<U16>(lineCapacity / SunCamMgr::SIZE_OF_ImageLine_RECORD(FULL_PIXELS + 3));
+    for (U16 line = 0; line <= oversizeLinesThatFit; line++) {
+        ASSERT_EVENTS_DownloadFailed_SIZE(0);
+        this->lineReply(line, FULL_PIXELS, static_cast<U8>(line));
+    }
     ASSERT_EVENTS_DownloadFailed_SIZE(1);
-    ASSERT_EVENTS_DownloadFailed(0, Slot::SLOT_1, 1, DownloadFailCause::PRODUCT_FULL);
-    ASSERT_EQ(this->checkProduct(header, PREVIEW_PIXELS, 1, 1), 1u);
+    ASSERT_EVENTS_DownloadFailed(0, Slot::SLOT_1, oversizeLinesThatFit, DownloadFailCause::PRODUCT_FULL);
+    ASSERT_EQ(this->checkProduct(header, FULL_PIXELS, oversizeLinesThatFit, 1), oversizeLinesThatFit);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 3, Fw::CmdResponse::EXECUTION_ERROR);
 }
 
 void SunCamMgrTester::testDownloadAbortCommanded() {
     this->setupNominal();
     this->sendCmd_DOWNLOAD_ABORT(0, 1);
-    this->dispatchAll();
+    this->dispatch();
     ASSERT_EVENTS_CommandRejected(0, Operation::DOWNLOAD_ABORT, RejectCause::NO_DOWNLOAD);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD_ABORT, 1, Fw::CmdResponse::EXECUTION_ERROR);
     this->clearHistory();
@@ -937,7 +964,7 @@ void SunCamMgrTester::testDownloadAbortCommanded() {
     this->lineReply(0, FULL_PIXELS, 0);
     this->lineReply(1, FULL_PIXELS, 1);
     this->sendCmd_DOWNLOAD_ABORT(0, 3);
-    this->dispatchAll();
+    this->dispatch();
     ASSERT_CMD_RESPONSE_SIZE(0);  // the pending line is still awaited
     ASSERT_EQ(this->m_frameCount, 9u);
     this->lineReply(2, FULL_PIXELS, 2);
@@ -956,30 +983,58 @@ void SunCamMgrTester::testDownloadAbortCommanded() {
     this->clearHistory();
     this->startDownload(Slot::SLOT_1, Resolution::PREVIEW, 4);
     this->sendCmd_DOWNLOAD_ABORT(0, 5);
-    this->dispatchAll();
+    this->dispatch();
     this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS);
     ASSERT_EVENTS_LineRetry_SIZE(0);
     ASSERT_EVENTS_DownloadAborted(0, Slot::SLOT_1, 0);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 4, Fw::CmdResponse::OK);
     ASSERT_CMD_RESPONSE(1, SunCamMgr::OPCODE_DOWNLOAD_ABORT, 5, Fw::CmdResponse::OK);
+    // abort while Memory Status is pending: the download ends without a product; a second abort is refused
+    this->clearHistory();
+    this->sendCmd_DOWNLOAD(0, 6, Slot::SLOT_2, Resolution::PREVIEW);
+    this->dispatch();
+    this->sendCmd_DOWNLOAD_ABORT(0, 7);
+    this->sendCmd_DOWNLOAD_ABORT(0, 8);
+    this->dispatch(2);
+    ASSERT_EVENTS_CommandRejected_SIZE(1);
+    ASSERT_EVENTS_CommandRejected(0, Operation::DOWNLOAD_ABORT, RejectCause::BUSY);
+    ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD_ABORT, 8, Fw::CmdResponse::BUSY);
+    this->memoryStatusAllSd();
+    ASSERT_EVENTS_DownloadAborted_SIZE(1);
+    ASSERT_EVENTS_DownloadAborted(0, Slot::SLOT_2, 0);
+    ASSERT_PRODUCT_GET_SIZE(0);
+    ASSERT_PRODUCT_SEND_SIZE(0);
+    ASSERT_CMD_RESPONSE(1, SunCamMgr::OPCODE_DOWNLOAD, 6, Fw::CmdResponse::OK);
+    ASSERT_CMD_RESPONSE(2, SunCamMgr::OPCODE_DOWNLOAD_ABORT, 7, Fw::CmdResponse::OK);
+    // abort pending while Memory Status times out: DownloadFailed, both commands answered
+    this->clearHistory();
+    this->sendCmd_DOWNLOAD(0, 9, Slot::SLOT_2, Resolution::PREVIEW);
+    this->dispatch();
+    this->sendCmd_DOWNLOAD_ABORT(0, 10);
+    this->dispatch();
+    this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS);
+    ASSERT_EVENTS_DownloadFailed(0, Slot::SLOT_2, 0, DownloadFailCause::MEMORY_STATUS_FAILED);
+    ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 9, Fw::CmdResponse::EXECUTION_ERROR);
+    ASSERT_CMD_RESPONSE(1, SunCamMgr::OPCODE_DOWNLOAD_ABORT, 10, Fw::CmdResponse::OK);
+    this->assertSetupState(SetupState::READY);
 }
 
 void SunCamMgrTester::testReplyTimeoutTicks() {
     this->setupNominal();
     this->sendCmd_PING(0, 1, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS - 1);
     ASSERT_EVENTS_ReplyTimeout_SIZE(0);
     ASSERT_CMD_RESPONSE_SIZE(0);
     this->tick();
     ASSERT_EVENTS_ReplyTimeout_SIZE(1);
     ASSERT_EVENTS_ReplyTimeout(0, Operation::PING, CMD_PING);
-    ASSERT_TLM_Timeouts(0, 1);
+    ASSERT_EQ(this->tlmHistory_Timeouts->at(this->tlmHistory_Timeouts->size() - 1).arg, 1u);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_PING, 1, Fw::CmdResponse::EXECUTION_ERROR);
     // a reply arriving on the last tick before expiry is accepted
     this->clearHistory();
     this->sendCmd_PING(0, 2, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS - 1);
     this->pingReply(1, 0, 1);
     ASSERT_EVENTS_ReplyTimeout_SIZE(0);
@@ -992,7 +1047,7 @@ void SunCamMgrTester::testReplyTimeoutTicks() {
 void SunCamMgrTester::testCameraErrorReply() {
     this->setupNominal();
     this->sendCmd_CAPTURE(0, 1, Slot::SLOT_1, TestPattern::OFF);
-    this->dispatchAll();
+    this->dispatch();
     this->errorReply(CMD_CAPTURE, 0x03, 42);
     ASSERT_EVENTS_CameraError_SIZE(1);
     ASSERT_EVENTS_CameraError(0, Operation::CAPTURE, CMD_CAPTURE, ErrorType::WRONG_MODE, 42);
@@ -1000,10 +1055,10 @@ void SunCamMgrTester::testCameraErrorReply() {
     ASSERT_TLM_CameraErrors(0, 1);
     ASSERT_EVENTS_CaptureComplete_SIZE(0);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_CAPTURE, 1, Fw::CmdResponse::EXECUTION_ERROR);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::READY);
+    this->assertSetupState(SetupState::READY);
     // an error reply naming another command is not this exchange's reply
     this->sendCmd_PING(0, 2, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     this->errorReply(CMD_CAPTURE, 0x01, 43);
     ASSERT_EVENTS_CameraError_SIZE(1);
     ASSERT_EVENTS_FrameDiscarded_SIZE(1);
@@ -1017,11 +1072,12 @@ void SunCamMgrTester::testMalformedAndStrayFrames() {
     // no operation in progress
     this->pingReply(1, 0, 1);
     ASSERT_EVENTS_FrameDiscarded_SIZE(1);
-    ASSERT_EVENTS_FrameDiscarded(0, DiscardCause::NO_OPERATION, 10, head(0x40, 0x50, 0x01, 0x00, 0x04, 0x01, 0x00, 0x00));
+    ASSERT_EVENTS_FrameDiscarded(0, DiscardCause::NO_OPERATION, 10,
+                                 head(0x40, 0x50, 0x01, 0x00, 0x04, 0x01, 0x00, 0x00));
     ASSERT_TLM_DiscardedBytes(0, 10);
 
     this->sendCmd_PING(0, 1, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     // wrong command byte
     this->ack(CMD_SET_MODE);
     ASSERT_EVENTS_FrameDiscarded_SIZE(2);
@@ -1031,7 +1087,7 @@ void SunCamMgrTester::testMalformedAndStrayFrames() {
     const U8 tooLong[6] = {START, CMD_PING, MODE_SD, 0x02, 0x83, END};
     this->receive(tooLong, sizeof tooLong);
     ASSERT_EVENTS_FrameDiscarded_SIZE(3);
-    ASSERT_EVENTS_FrameDiscarded(2, DiscardCause::MALFORMED, 5, head(0x40, 0x50, 0x01, 0x02, 0x83, 0, 0, 0));
+    ASSERT_EVENTS_FrameDiscarded(2, DiscardCause::MALFORMED, 6, head(0x40, 0x50, 0x01, 0x02, 0x83, 0x0D, 0, 0));
     ASSERT_TLM_MalformedReplies(0, 1);
     // missing terminator: the frame ends on a byte other than 0x0D, then resync on the next 0x40
     const U8 noEnd[10] = {START, CMD_PING, MODE_SD, 0x00, 0x04, 1, 2, 3, 4, 0x55};
@@ -1049,11 +1105,12 @@ void SunCamMgrTester::testMalformedAndStrayFrames() {
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_PING, 1, Fw::CmdResponse::OK);
     // late reply after the exchange timed out
     this->sendCmd_PING(0, 2, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS);
     this->pingReply(1, 0, 1);
     ASSERT_EVENTS_FrameDiscarded_SIZE(6);
-    ASSERT_EVENTS_FrameDiscarded(5, DiscardCause::NO_OPERATION, 10, head(0x40, 0x50, 0x01, 0x00, 0x04, 0x01, 0x00, 0x00));
+    ASSERT_EVENTS_FrameDiscarded(5, DiscardCause::NO_OPERATION, 10,
+                                 head(0x40, 0x50, 0x01, 0x00, 0x04, 0x01, 0x00, 0x00));
     // non-OK buffer with data: discarded and returned; a null notice has nothing to return
     const U8 junk[4] = {1, 2, 3, 4};
     this->receive(junk, sizeof junk, Drv::ByteStreamStatus::OTHER_ERROR);
@@ -1061,7 +1118,32 @@ void SunCamMgrTester::testMalformedAndStrayFrames() {
     ASSERT_EVENTS_FrameDiscarded(6, DiscardCause::MALFORMED, 4, head(1, 2, 3, 4, 0, 0, 0, 0));
     this->receive(nullptr, 0, Drv::ByteStreamStatus::RECV_NO_DATA);
     ASSERT_EVENTS_FrameDiscarded_SIZE(7);
-    ASSERT_EQ(this->tlmHistory_DiscardedBytes->at(this->tlmHistory_DiscardedBytes->size() - 1).arg, 48u);
+    ASSERT_EQ(this->tlmHistory_DiscardedBytes->at(this->tlmHistory_DiscardedBytes->size() - 1).arg, 49u);
+    // replies that cannot be decoded are malformed and leave the exchange pending: an error reply of the
+    // wrong length or with an unknown error type, an acknowledgement of the wrong length, a mode byte that
+    // is not a Mode, a Download line without its line number
+    this->sendCmd_PING(0, 3, PingType::MCU);
+    this->dispatch();
+    const U8 shortError[2] = {CMD_PING, 0x01};
+    this->reply(CMD_ERROR, MODE_SD, shortError, sizeof shortError);
+    const U8 unknownType[3] = {CMD_PING, 0x05, 1};
+    this->reply(CMD_ERROR, MODE_SD, unknownType, sizeof unknownType);
+    const U8 shortPing[3] = {1, 2, 3};
+    this->reply(CMD_PING, MODE_SD, shortPing, sizeof shortPing);
+    const U8 pingPayload[4] = {1, 2, 0, 3};
+    this->reply(CMD_PING, 0x03, pingPayload, sizeof pingPayload);
+    ASSERT_EQ(this->tlmHistory_MalformedReplies->at(this->tlmHistory_MalformedReplies->size() - 1).arg, 8u);
+    ASSERT_EVENTS_CameraError_SIZE(0);
+    ASSERT_CMD_RESPONSE_SIZE(2);
+    this->pingReply(1, 0, 1);
+    ASSERT_CMD_RESPONSE(2, SunCamMgr::OPCODE_PING, 3, Fw::CmdResponse::OK);
+    this->startDownload(Slot::SLOT_1, Resolution::PREVIEW, 4);
+    const U8 shortLine[1] = {0};
+    this->reply(CMD_DOWNLOAD, MODE_SD, shortLine, sizeof shortLine);
+    ASSERT_EQ(this->tlmHistory_MalformedReplies->at(this->tlmHistory_MalformedReplies->size() - 1).arg, 9u);
+    ASSERT_EVENTS_DownloadFailed_SIZE(0);
+    this->lineReply(0, PREVIEW_PIXELS, 0);
+    ASSERT_EQ(this->tlmHistory_LinesDownloaded->at(this->tlmHistory_LinesDownloaded->size() - 1).arg, 1u);
 }
 
 void SunCamMgrTester::testSplitAndCrPayloadReply() {
@@ -1098,37 +1180,46 @@ void SunCamMgrTester::testSplitAndCrPayloadReply() {
     // a reply echoing the wrong line number is not this exchange's reply
     this->lineReply(7, PREVIEW_PIXELS, 0);
     ASSERT_EVENTS_FrameDiscarded_SIZE(1);
-    ASSERT_EVENTS_FrameDiscarded(0, DiscardCause::WRONG_COMMAND, 88, head(0x40, 0x44, 0x01, 0x00, 0x52, 0x00, 0x07, 0x00));
+    ASSERT_EVENTS_FrameDiscarded(0, DiscardCause::WRONG_COMMAND, 88,
+                                 head(0x40, 0x44, 0x01, 0x00, 0x52, 0x00, 0x07, 0x00));
     this->assertFrame(CMD_DOWNLOAD, 1, 1, 0, 3, 10);
 }
 
 void SunCamMgrTester::testModeMismatch() {
     this->setupNominal();
     this->sendCmd_PING(0, 1, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     this->pingReply(1, 0, 1, MODE_HD);
     ASSERT_EVENTS_ModeMismatch_SIZE(1);
     ASSERT_EVENTS_ModeMismatch(0, Mode::SD, Mode::HD);
     ASSERT_EVENTS_PingReply_SIZE(0);
     ASSERT_TLM_CameraMode(0, Mode::HD);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_PING, 1, Fw::CmdResponse::EXECUTION_ERROR);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
     // during set-up the mode is not yet commanded: the first ping may report Sleep (see setupNominal)
     // a push reply reporting the wrong mode fails the push with MODE_MISMATCH
     this->setupNominal();
-    this->paramSet_EXPOSURE(10, Fw::ParamValid::VALID);
-    this->paramSend_EXPOSURE(0, 0);
+    this->setExposure(10);
     this->tick();
     this->ack(CMD_SET_EXPOSURE, MODE_SLEEP);
     ASSERT_EVENTS_ModeMismatch(0, Mode::SD, Mode::SLEEP);
     ASSERT_EVENTS_SettingPushFailed(0, Setting::EXPOSURE, FailCause::MODE_MISMATCH);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
+    // a line reply in the wrong mode ends the download and the READY state
+    this->setupNominal(MODE_SD, 10);
+    this->startDownload(Slot::SLOT_1, Resolution::PREVIEW, 3);
+    this->lineReply(0, PREVIEW_PIXELS, 0, MODE_HD);
+    ASSERT_EVENTS_ModeMismatch(0, Mode::SD, Mode::HD);
+    ASSERT_EVENTS_DownloadFailed(0, Slot::SLOT_1, 0, DownloadFailCause::LINE_FAILED);
+    ASSERT_PRODUCT_SEND_SIZE(1);
+    ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 3, Fw::CmdResponse::EXECUTION_ERROR);
+    this->assertSetupState(SetupState::NOT_SETUP);
 }
 
 void SunCamMgrTester::testMemoryStatusAndRegister() {
     this->setupNominal();
     this->sendCmd_MEMORY_STATUS(0, 1);
-    this->dispatchAll();
+    this->dispatch();
     this->assertFrame(CMD_MEMORY_STATUS, 0, 0, 0, 0, 6);
     const U8 modes[4] = {MODE_HD, MODE_HD, MODE_HD, MODE_HD};
     const U16 exposures[4] = {5, 6, 7, 8};
@@ -1137,26 +1228,37 @@ void SunCamMgrTester::testMemoryStatusAndRegister() {
     ASSERT_TLM_MemorySlots_SIZE(1);
     ASSERT_EQ(this->tlmHistory_MemorySlots->at(0).arg[3], MemorySlot(Mode::HD, 8, 12));
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_MEMORY_STATUS, 1, Fw::CmdResponse::OK);
+    // a record whose mode byte is not a Mode is malformed; the exchange stays pending for a valid reply
+    this->sendCmd_MEMORY_STATUS(0, 5);
+    this->dispatch();
+    const U8 badModes[4] = {MODE_SD, 7, MODE_SD, MODE_SD};
+    this->memoryStatusReply(badModes, exposures, uptimes);
+    ASSERT_TLM_MemorySlots_SIZE(1);
+    ASSERT_TLM_MalformedReplies(0, 1);
+    ASSERT_CMD_RESPONSE_SIZE(1);
+    this->memoryStatusReply(modes, exposures, uptimes);
+    ASSERT_TLM_MemorySlots_SIZE(2);
+    ASSERT_CMD_RESPONSE(1, SunCamMgr::OPCODE_MEMORY_STATUS, 5, Fw::CmdResponse::OK);
 
     this->sendCmd_READ_REGISTER(0, 2, 0x3012);
-    this->dispatchAll();
-    this->assertFrame(CMD_READ_REGISTER, 0x30, 0x12, 0, 0, 7);
+    this->dispatch();
+    this->assertFrame(CMD_READ_REGISTER, 0x30, 0x12, 0, 0, 8);
     // address echo mismatch: discarded, exchange still pending
     this->registerReply(0x3013, 0x0100);
-    ASSERT_EVENTS_FrameDiscarded_SIZE(1);
-    ASSERT_EVENTS_FrameDiscarded(0, DiscardCause::WRONG_COMMAND, 10, head(0x40, 0x52, 0x01, 0x00, 0x04, 0x30, 0x13, 0x01));
+    ASSERT_EVENTS_FrameDiscarded_SIZE(2);
+    ASSERT_EVENTS_FrameDiscarded(1, DiscardCause::WRONG_COMMAND, 10,
+                                 head(0x40, 0x52, 0x01, 0x00, 0x04, 0x30, 0x13, 0x01));
     ASSERT_EVENTS_RegisterRead_SIZE(0);
     this->registerReply(0x3012, 0x0100);
     ASSERT_EVENTS_RegisterRead(0, 0x3012, 0x0100);
     ASSERT_TLM_RegisterValue(0, RegisterValue(0x3012, 0x0100));
     ASSERT_TLM_ExposureReadback_SIZE(0);  // a commanded read is not the exposure readback
-    ASSERT_CMD_RESPONSE(1, SunCamMgr::OPCODE_READ_REGISTER, 2, Fw::CmdResponse::OK);
+    ASSERT_CMD_RESPONSE(2, SunCamMgr::OPCODE_READ_REGISTER, 2, Fw::CmdResponse::OK);
 }
 
 void SunCamMgrTester::testModeChangeRepushesExposure() {
     this->setupNominal();
-    this->paramSet_CAMERA_MODE(CaptureMode::HD, Fw::ParamValid::VALID);
-    this->paramSend_CAMERA_MODE(0, 0);
+    this->setCameraMode(CaptureMode::HD);
     this->tick();
     this->assertFrame(CMD_SET_MODE, MODE_HD, 0, 0, 0, 6);
     this->ack(CMD_SET_MODE, MODE_HD);
@@ -1167,12 +1269,12 @@ void SunCamMgrTester::testModeChangeRepushesExposure() {
     this->assertFrame(CMD_READ_REGISTER, 0x30, 0x12, 0, 0, 8);
     this->registerReply(EXPOSURE_REGISTER, DEFAULT_EXPOSURE, MODE_HD);
     ASSERT_EVENTS_ExposureReadback(0, DEFAULT_EXPOSURE, DEFAULT_EXPOSURE);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::READY);
+    this->assertSetupState(SetupState::READY);
     this->tick(3);
     ASSERT_EQ(this->m_frameCount, 8u);
     // the new mode is now the commanded mode for the mode check
     this->sendCmd_PING(0, 1, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     this->pingReply(1, 0, 1, MODE_HD);
     ASSERT_EVENTS_ModeMismatch_SIZE(0);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_PING, 1, Fw::CmdResponse::OK);
@@ -1191,34 +1293,55 @@ void SunCamMgrTester::testSendAndAllocationFailure() {
     // send failure on a command
     this->m_sendStatus = Drv::ByteStreamStatus::OTHER_ERROR;
     this->sendCmd_PING(0, 2, PingType::MCU);
-    this->dispatchAll();
+    this->dispatch();
     ASSERT_EVENTS_SendFailed(0, Operation::PING, Drv::ByteStreamStatus::OTHER_ERROR);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_PING, 2, Fw::CmdResponse::EXECUTION_ERROR);
     ASSERT_EQ(this->tlmHistory_CurrentOperation->at(this->tlmHistory_CurrentOperation->size() - 1).arg,
               Operation::NONE);
+    // the first frame of every READY command refused; SLEEP refused ends in NOT_SETUP
+    this->sendCmd_MEMORY_STATUS(0, 3);
+    this->sendCmd_CAPTURE(0, 4, Slot::SLOT_1, TestPattern::OFF);
+    this->sendCmd_DOWNLOAD(0, 5, Slot::SLOT_1, Resolution::FULL);
+    this->sendCmd_READ_REGISTER(0, 6, 0x3012);
+    this->dispatch(4);
+    ASSERT_EVENTS_SendFailed_SIZE(5);
+    ASSERT_EVENTS_DownloadFailed_SIZE(1);
+    ASSERT_EVENTS_DownloadFailed(0, Slot::SLOT_1, 0, DownloadFailCause::SEND_FAILED);
+    ASSERT_PRODUCT_GET_SIZE(0);
+    ASSERT_CMD_RESPONSE_SIZE(5);
+    for (U32 i = 1; i < 5; i++) {
+        ASSERT_EQ(this->cmdResponseHistory->at(i).cmdSeq, i + 2);
+        ASSERT_EQ(this->cmdResponseHistory->at(i).response, Fw::CmdResponse(Fw::CmdResponse::EXECUTION_ERROR));
+    }
+    this->assertSetupState(SetupState::READY);
+    this->sendCmd_SLEEP(0, 7);
+    this->dispatch();
+    ASSERT_EVENTS_SendFailed(5, Operation::SLEEP, Drv::ByteStreamStatus::OTHER_ERROR);
+    ASSERT_CMD_RESPONSE(5, SunCamMgr::OPCODE_SLEEP, 7, Fw::CmdResponse::EXECUTION_ERROR);
+    this->assertSetupState(SetupState::NOT_SETUP);
+    this->m_sendStatus = Drv::ByteStreamStatus::OP_OK;
+    this->setupNominal();
+    this->m_sendStatus = Drv::ByteStreamStatus::OTHER_ERROR;
     // send failure on a push
-    this->paramSet_EXPOSURE(10, Fw::ParamValid::VALID);
-    this->paramSend_EXPOSURE(0, 0);
+    this->setExposure(10);
     this->tick();
     ASSERT_EVENTS_SettingPushFailed(0, Setting::EXPOSURE, FailCause::SEND_FAILED);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::NOT_SETUP);
+    this->assertSetupState(SetupState::NOT_SETUP);
     this->m_sendStatus = Drv::ByteStreamStatus::OP_OK;
     this->clearHistory();
     // product allocation failure
-    this->setupNominal();
+    this->setupNominal(MODE_SD, 10);
     this->m_productGetStatus = Fw::Success::FAILURE;
     this->sendCmd_DOWNLOAD(0, 3, Slot::SLOT_1, Resolution::FULL);
-    this->dispatchAll();
+    this->dispatch();
     this->memoryStatusAllSd();
     ASSERT_EVENTS_ProductAllocationFailed_SIZE(1);
-    ASSERT_EVENTS_ProductAllocationFailed(
-        0, static_cast<U32>(SunCamMgr::SIZE_OF_ImageHeader_RECORD +
-                            FULL_LINES * SunCamMgr::SIZE_OF_ImageLine_RECORD(FULL_PIXELS + 3)));
+    ASSERT_EVENTS_ProductAllocationFailed(0, static_cast<U32>(imageDataSize(FULL_LINES, FULL_PIXELS)));
     ASSERT_EVENTS_DownloadStarted_SIZE(0);
     ASSERT_PRODUCT_SEND_SIZE(0);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 3, Fw::CmdResponse::EXECUTION_ERROR);
-    ASSERT_EQ(this->m_frameCount, 11u);  // no Download frame
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::READY);
+    ASSERT_EQ(this->m_frameCount, 24u);  // no Download frame
+    this->assertSetupState(SetupState::READY);
 }
 
 void SunCamMgrTester::testQueueFullHooks() {
@@ -1226,11 +1349,22 @@ void SunCamMgrTester::testQueueFullHooks() {
     for (U32 i = 0; i < TEST_INSTANCE_QUEUE_DEPTH; i++) {
         this->sendCmd_PING(0, i, PingType::MCU);
     }
-    this->sendCmd_CAPTURE(0, 100, Slot::SLOT_1, TestPattern::OFF);
+    this->sendCmd_SETUP_CAMERA(0, 100);
     this->sendCmd_SLEEP(0, 101);
-    ASSERT_CMD_RESPONSE_SIZE(2);
-    ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_CAPTURE, 100, Fw::CmdResponse::BUSY);
-    ASSERT_CMD_RESPONSE(1, SunCamMgr::OPCODE_SLEEP, 101, Fw::CmdResponse::BUSY);
+    this->sendCmd_PING(0, 102, PingType::MCU);
+    this->sendCmd_MEMORY_STATUS(0, 103);
+    this->sendCmd_CAPTURE(0, 104, Slot::SLOT_1, TestPattern::OFF);
+    this->sendCmd_DOWNLOAD(0, 105, Slot::SLOT_1, Resolution::FULL);
+    this->sendCmd_DOWNLOAD_ABORT(0, 106);
+    this->sendCmd_READ_REGISTER(0, 107, 0x3012);
+    const FwOpcodeType opcodes[8] = {SunCamMgr::OPCODE_SETUP_CAMERA,   SunCamMgr::OPCODE_SLEEP,
+                                     SunCamMgr::OPCODE_PING,           SunCamMgr::OPCODE_MEMORY_STATUS,
+                                     SunCamMgr::OPCODE_CAPTURE,        SunCamMgr::OPCODE_DOWNLOAD,
+                                     SunCamMgr::OPCODE_DOWNLOAD_ABORT, SunCamMgr::OPCODE_READ_REGISTER};
+    ASSERT_CMD_RESPONSE_SIZE(8);
+    for (U32 i = 0; i < 8; i++) {
+        ASSERT_CMD_RESPONSE(i, opcodes[i], 100 + i, Fw::CmdResponse::BUSY);
+    }
     const U8 bytes[3] = {1, 2, 3};
     Fw::Buffer buffer(this->m_rxStore, sizeof bytes);
     ::memcpy(this->m_rxStore, bytes, sizeof bytes);
@@ -1240,18 +1374,18 @@ void SunCamMgrTester::testQueueFullHooks() {
     this->invoke_to_pingIn(0, 8);
     this->invoke_to_pingIn(0, 9);
     this->invoke_to_run(0, 0);
-    this->invoke_to_run(0, 0);  // second tick is not even queued (atomic set)
-    this->dispatchAll();
+    this->invoke_to_run(0, 0);  // the hook cleared the atomic, so this tick is attempted and dropped too
+    this->dispatch(TEST_INSTANCE_QUEUE_DEPTH);
     ASSERT_from_pingOut_SIZE(0);
     ASSERT_EVENTS_QueueOverflow_SIZE(0);
     // the next tick reports the drops per source
     this->tick();
     ASSERT_EVENTS_QueueOverflow_SIZE(4);
-    ASSERT_EVENTS_QueueOverflow(0, QueueInput::COMMAND, 2);
+    ASSERT_EVENTS_QueueOverflow(0, QueueInput::COMMAND, 8);
     ASSERT_EVENTS_QueueOverflow(1, QueueInput::UART_RECEIVE, 1);
-    ASSERT_EVENTS_QueueOverflow(2, QueueInput::RUN_TICK, 1);
+    ASSERT_EVENTS_QueueOverflow(2, QueueInput::RUN_TICK, 2);
     ASSERT_EVENTS_QueueOverflow(3, QueueInput::HEALTH_PING, 3);
-    ASSERT_EQ(this->tlmHistory_QueueOverflows->at(this->tlmHistory_QueueOverflows->size() - 1).arg, 7u);
+    ASSERT_EQ(this->tlmHistory_QueueOverflows->at(this->tlmHistory_QueueOverflows->size() - 1).arg, 14u);
     this->tick();
     ASSERT_EVENTS_QueueOverflow_SIZE(4);
 }
@@ -1292,19 +1426,17 @@ void SunCamMgrTester::testExposureRangeCheck() {
     this->setupNominal();
     const U16 rejected[2] = {KissCamConfig::EXPOSURE_MIN - 1, KissCamConfig::EXPOSURE_MAX + 1};
     for (U32 i = 0; i < 2; i++) {
-        this->paramSet_EXPOSURE(rejected[i], Fw::ParamValid::VALID);
-        this->paramSend_EXPOSURE(0, 0);
+        this->setExposure(rejected[i]);
         this->tick(2);
         ASSERT_EVENTS_SettingRejected_SIZE(i + 1);
         ASSERT_EVENTS_SettingRejected(i, Setting::EXPOSURE, rejected[i], KissCamConfig::EXPOSURE_MIN,
                                       KissCamConfig::EXPOSURE_MAX);
         ASSERT_EQ(this->m_frameCount, 5u);
-        ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::READY);
+        this->assertSetupState(SetupState::READY);
     }
     const U16 accepted[2] = {KissCamConfig::EXPOSURE_MIN, KissCamConfig::EXPOSURE_MAX};
     for (U32 i = 0; i < 2; i++) {
-        this->paramSet_EXPOSURE(accepted[i], Fw::ParamValid::VALID);
-        this->paramSend_EXPOSURE(0, 0);
+        this->setExposure(accepted[i]);
         this->tick();
         this->assertFrame(CMD_SET_EXPOSURE, static_cast<U8>(accepted[i] >> 8), static_cast<U8>(accepted[i] & 0xFF), 0,
                           0, 6 + 2 * i);
@@ -1314,7 +1446,7 @@ void SunCamMgrTester::testExposureRangeCheck() {
     ASSERT_EVENTS_SettingApplied_SIZE(2);
     ASSERT_EVENTS_SettingRejected_SIZE(2);
     // persisted out-of-range value fails set-up at SET_EXPOSURE
-    this->paramSet_EXPOSURE(KissCamConfig::EXPOSURE_MAX + 1, Fw::ParamValid::VALID);
+    this->setExposure(KissCamConfig::EXPOSURE_MAX + 1);
     this->clearHistory();
     this->sendSetup(5);
     this->pingReply(1, 0, 1);
@@ -1328,39 +1460,45 @@ void SunCamMgrTester::testRunPortSingleQueuedTick() {
     for (U32 i = 0; i < 5; i++) {
         this->invoke_to_run(0, 0);
     }
-    // exactly one message is queued: the first dispatch runs the tick, the second finds the queue empty
-    ASSERT_EQ(this->component.doDispatch(), Fw::QueuedComponentBase::MSG_DISPATCH_OK);
+    // exactly one tick message is queued: one dispatch runs it (first-tick channel write) ...
+    this->dispatch();
     ASSERT_TLM_SetupState_SIZE(1);
-    ASSERT_EQ(this->component.doDispatch(), Fw::QueuedComponentBase::MSG_DISPATCH_EMPTY);
-    // after dispatch, the next run queues again
-    this->invoke_to_run(0, 0);
-    ASSERT_EQ(this->component.doDispatch(), Fw::QueuedComponentBase::MSG_DISPATCH_OK);
+    // ... and the next message in the queue is the health ping queued afterwards, not another tick
+    this->invoke_to_pingIn(0, 1);
+    this->dispatch();
+    ASSERT_from_pingOut_SIZE(1);
+    // once dispatched, every later run queues a tick again: tick TLM_PERIOD_TICKS + 1 re-writes the channels
+    for (U32 i = 0; i < KissCamConfig::TLM_PERIOD_TICKS; i++) {
+        this->invoke_to_run(0, 0);
+        this->dispatch();
+    }
+    ASSERT_TLM_SetupState_SIZE(2);
     // the overflow hook clears the atomic: a tick dropped from a full queue does not block later ticks
     for (U32 i = 0; i < TEST_INSTANCE_QUEUE_DEPTH; i++) {
         this->invoke_to_pingIn(0, i);
     }
     this->invoke_to_run(0, 0);  // dropped by the hook
-    this->dispatchAll();
+    this->dispatch(TEST_INSTANCE_QUEUE_DEPTH);
     this->invoke_to_run(0, 0);
-    ASSERT_EQ(this->component.doDispatch(), Fw::QueuedComponentBase::MSG_DISPATCH_OK);
+    this->dispatch();
     ASSERT_EVENTS_QueueOverflow_SIZE(1);
     ASSERT_EVENTS_QueueOverflow(0, QueueInput::RUN_TICK, 1);
 }
 
 void SunCamMgrTester::testHealthPingAndDrvConnected() {
     this->invoke_to_pingIn(0, 0xCAFE);
-    this->dispatchAll();
+    this->dispatch();
     ASSERT_from_pingOut_SIZE(1);
     ASSERT_from_pingOut(0, 0xCAFE);
     this->invoke_to_drvConnected(0);
-    this->dispatchAll();
+    this->dispatch();
     ASSERT_EQ(this->m_frameCount, 0u);
     ASSERT_EVENTS_SIZE(0);
     this->setupNominal();
     this->invoke_to_drvConnected(0);
-    this->dispatchAll();
+    this->dispatch();
     ASSERT_EQ(this->m_frameCount, 5u);
-    ASSERT_EQ(this->tlmHistory_SetupState->at(this->tlmHistory_SetupState->size() - 1).arg, SetupState::READY);
+    this->assertSetupState(SetupState::READY);
 }
 
 }  // namespace KissCam
