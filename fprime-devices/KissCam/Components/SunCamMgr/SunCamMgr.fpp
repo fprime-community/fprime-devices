@@ -163,7 +163,7 @@ module KissCam {
 
         @ Read Register reply
         event RegisterRead(address: U16, value: U16) severity activity high \
-            format "Register 0x{x} = 0x{x}"
+            format "Register {} = {}"
 
         @ A ground command was rejected (response EXECUTION_ERROR, or BUSY for cause BUSY)
         event CommandRejected(operation: Operation, cause: RejectCause) severity warning low \
@@ -171,11 +171,11 @@ module KissCam {
 
         @ The camera answered with an error reply
         event CameraError(operation: Operation, cmdByte: U8, errorType: ErrorType, count: U8) severity warning high \
-            format "Camera error during {}: command 0x{x} {} (invalid count {})"
+            format "Camera error during {}: command {} {} (invalid count {})"
 
         @ No reply within REPLY_TIMEOUT_TICKS
         event ReplyTimeout(operation: Operation, cmdByte: U8) severity warning high \
-            format "Camera reply timeout during {} (command 0x{x})"
+            format "Camera reply timeout during {} (command {})"
 
         @ Received bytes discarded; throttled, SETUP_CAMERA clears the throttle
         event FrameDiscarded(cause: DiscardCause, bytes: U32, head: FrameHead) severity warning low \
