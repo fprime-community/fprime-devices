@@ -12,6 +12,10 @@
 
 namespace KissCam {
 
+static_assert(KissCamConfig::REPLY_TIMEOUT_TICKS > 0, "a reply must be allowed at least one run tick");
+static_assert(KissCamConfig::TLM_PERIOD_TICKS > 0, "the periodic channel write divides the tick count");
+static_assert(KissCamConfig::LINE_RETRIES > 0, "a line must be requested at least once");
+
 namespace {
 
 //! Payload length of the acknowledgement of each command (datasheet §7.4); Download is checked separately
@@ -90,6 +94,7 @@ SunCamMgr::SunCamMgr(const char* const compName)
       m_ticksWaiting(0),
       m_setupStep(SetupStep::PING_MCU),
       m_exposureSent(0),
+      m_modeSent(CaptureMode::SD),
       m_pingType(PingType::MCU),
       m_captureSlot(Slot::SLOT_1),
       m_captureTestPattern(TestPattern::OFF),
@@ -169,7 +174,7 @@ void SunCamMgr::run_handler(FwIndexType portNum, U32 context) {
 // ----------------------------------------------------------------------
 
 void SunCamMgr::SETUP_CAMERA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (!this->acceptCommand(opCode, cmdSeq, Operation::SETUP_CAMERA, false)) {
+    if (!this->acceptCommand(opCode, cmdSeq, Operation::SETUP_CAMERA, Admission::ANY_STATE)) {
         return;
     }
     {
@@ -178,12 +183,14 @@ void SunCamMgr::SETUP_CAMERA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
         this->m_exposureDirty = false;
     }
     this->log_ACTIVITY_LO_SetupStarted();
+    this->log_WARNING_LO_FrameDiscarded_ThrottleClear();
+    this->log_WARNING_HI_QueueOverflow_ThrottleClear();
     this->setSetupState(SetupState::SETTING_UP);
     this->sendSetupStep(SetupStep::PING_MCU);
 }
 
 void SunCamMgr::SLEEP_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (!this->acceptCommand(opCode, cmdSeq, Operation::SLEEP, false)) {
+    if (!this->acceptCommand(opCode, cmdSeq, Operation::SLEEP, Admission::ANY_STATE)) {
         return;
     }
     if (!this->sendFrame(CMD_SET_MODE, static_cast<U8>(Mode::SLEEP), 0, 0, 0)) {
@@ -192,7 +199,7 @@ void SunCamMgr::SLEEP_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
 }
 
 void SunCamMgr::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, const KissCam::PingType& pingType) {
-    if (!this->acceptCommand(opCode, cmdSeq, Operation::PING, false)) {
+    if (!this->acceptCommand(opCode, cmdSeq, Operation::PING, Admission::ANY_STATE)) {
         return;
     }
     this->m_pingType = pingType.e;
@@ -202,7 +209,7 @@ void SunCamMgr::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, const KissCam::
 }
 
 void SunCamMgr::MEMORY_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (!this->acceptCommand(opCode, cmdSeq, Operation::MEMORY_STATUS, true)) {
+    if (!this->acceptCommand(opCode, cmdSeq, Operation::MEMORY_STATUS, Admission::READY_ONLY)) {
         return;
     }
     if (!this->sendFrame(CMD_MEMORY_STATUS, 0, 0, 0, 0)) {
@@ -214,7 +221,7 @@ void SunCamMgr::CAPTURE_cmdHandler(FwOpcodeType opCode,
                                    U32 cmdSeq,
                                    const KissCam::Slot& slot,
                                    const KissCam::TestPattern& testPattern) {
-    if (!this->acceptCommand(opCode, cmdSeq, Operation::CAPTURE, true)) {
+    if (!this->acceptCommand(opCode, cmdSeq, Operation::CAPTURE, Admission::READY_ONLY)) {
         return;
     }
     this->m_captureSlot = slot.e;
@@ -228,7 +235,7 @@ void SunCamMgr::DOWNLOAD_cmdHandler(FwOpcodeType opCode,
                                     U32 cmdSeq,
                                     const KissCam::Slot& slot,
                                     const KissCam::Resolution& resolution) {
-    if (!this->acceptCommand(opCode, cmdSeq, Operation::DOWNLOAD, true)) {
+    if (!this->acceptCommand(opCode, cmdSeq, Operation::DOWNLOAD, Admission::READY_ONLY)) {
         return;
     }
     this->m_downloadPhase = DL_MEMORY_STATUS;
@@ -260,7 +267,7 @@ void SunCamMgr::DOWNLOAD_ABORT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
 }
 
 void SunCamMgr::READ_REGISTER_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U16 address) {
-    if (!this->acceptCommand(opCode, cmdSeq, Operation::READ_REGISTER, true)) {
+    if (!this->acceptCommand(opCode, cmdSeq, Operation::READ_REGISTER, Admission::READY_ONLY)) {
         return;
     }
     if (!this->sendFrame(CMD_READ_REGISTER, highByte(address), lowByte(address), 0, 0)) {
@@ -276,7 +283,7 @@ void SunCamMgr::runInternal_internalInterfaceHandler() {
     this->m_runQueued = false;
 
     // Drops counted by the queue-full hooks since the last tick
-    U32 drops[QueueInput::NUM_CONSTANTS];
+    U32 drops[QueueInput::NUM_CONSTANTS] = {0, 0, 0, 0};
     {
         Os::ScopeLock lock(this->m_lock);
         ::memcpy(drops, this->m_drops, sizeof drops);
@@ -408,13 +415,13 @@ void SunCamMgr::parameterUpdated(FwPrmIdType id) {
 // Command admission and operation bookkeeping
 // ----------------------------------------------------------------------
 
-bool SunCamMgr::acceptCommand(FwOpcodeType opCode, U32 cmdSeq, Operation::T operation, bool needsReady) {
+bool SunCamMgr::acceptCommand(FwOpcodeType opCode, U32 cmdSeq, Operation::T operation, Admission admission) {
     if (this->m_operation != Operation::NONE) {
         this->log_WARNING_LO_CommandRejected(operation, RejectCause::BUSY);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::BUSY);
         return false;
     }
-    if (needsReady && (this->m_setupState != SetupState::READY)) {
+    if ((admission == Admission::READY_ONLY) && (this->m_setupState != SetupState::READY)) {
         this->log_WARNING_LO_CommandRejected(operation, RejectCause::NOT_READY);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
         return false;
@@ -472,8 +479,6 @@ bool SunCamMgr::sendFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4) {
     this->m_txFrame[4] = p3;
     this->m_txFrame[5] = p4;
     this->m_txFrame[6] = FRAME_END;
-    this->m_exchanges++;
-    this->tlmWrite_Exchanges(this->m_exchanges);
     Fw::Buffer frame(this->m_txFrame, COMMAND_FRAME_SIZE);
     const Drv::ByteStreamStatus status = this->drvSendOut_out(0, frame);
     if (status != Drv::ByteStreamStatus::OP_OK) {
@@ -491,6 +496,13 @@ bool SunCamMgr::sendFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4) {
 
 void SunCamMgr::exchangeFailed(FailCause::T cause) {
     this->m_pendingCmd = 0;
+    // a reply left incomplete by the failed exchange must not frame the next one
+    if (this->m_rxLen > 0) {
+        this->discard(DiscardCause::MALFORMED, this->m_rx, FW_MIN(this->m_rxLen, FRAME_HEAD_SIZE),
+                      static_cast<U32>(this->m_rxLen));
+        this->m_rxLen = 0;
+    }
+    this->m_strayCount = 0;
     switch (this->m_operation) {
         case Operation::SETUP_CAMERA:
             this->log_WARNING_HI_SetupFailed(this->m_setupStep, cause);
@@ -528,13 +540,19 @@ void SunCamMgr::exchangeFailed(FailCause::T cause) {
                 this->requestLine();
             }
             break;
-        default:
-            // PING, MEMORY_STATUS, CAPTURE, READ_REGISTER
+        case Operation::PING:
+        case Operation::MEMORY_STATUS:
+        case Operation::CAPTURE:
+        case Operation::READ_REGISTER:
             if (cause == FailCause::MODE_MISMATCH) {
                 this->setSetupState(SetupState::NOT_SETUP);
             }
             this->respond(Fw::CmdResponse::EXECUTION_ERROR);
             this->endOperation();
+            break;
+        default:
+            // NONE and DOWNLOAD_ABORT never own an exchange
+            FW_ASSERT(0, static_cast<FwAssertArgType>(this->m_operation));
             break;
     }
 }
@@ -566,12 +584,12 @@ void SunCamMgr::assemble(const U8* bytes, FwSizeType size) {
             malformed = true;
         } else if (this->m_rxLen == REPLY_HEADER_SIZE + static_cast<FwSizeType>(length) + 1) {
             if (byte == FRAME_END) {
-                this->processReply(this->m_rx, this->m_rxLen);
+                // the frame is consumed before processing: a failed exchange may reset the assembler
+                const FwSizeType frameSize = this->m_rxLen;
+                this->m_rxLen = 0;
+                this->processReply(this->m_rx, frameSize);
             } else {
                 malformed = true;
-            }
-            if (!malformed) {
-                this->m_rxLen = 0;
             }
         }
         if (malformed) {
@@ -639,6 +657,9 @@ void SunCamMgr::processReply(const U8* frame, FwSizeType size) {
         this->tlmWrite_CameraInvalidCmds(count);
         this->m_cameraErrors++;
         this->tlmWrite_CameraErrors(this->m_cameraErrors);
+        if (modeByte < Mode::NUM_CONSTANTS) {
+            this->tlmWrite_CameraMode(static_cast<Mode::T>(modeByte));
+        }
         this->exchangeFailed(FailCause::CAMERA_ERROR);
         return;
     }
@@ -683,6 +704,8 @@ void SunCamMgr::processReply(const U8* frame, FwSizeType size) {
             return;
         }
     }
+    this->m_exchanges++;
+    this->tlmWrite_Exchanges(this->m_exchanges);
     this->m_pendingCmd = 0;
     this->handleReply(reported, payload, length);
 }
@@ -756,7 +779,7 @@ void SunCamMgr::handleReply(Mode::T reported, const U8* payload, U16 length) {
                 this->respond(Fw::CmdResponse::OK);
                 this->endOperation();
             } else {
-                this->handleMemoryStatusForDownload(slots);
+                this->handleMemoryStatusForDownload(slots, reported);
             }
             break;
         }
@@ -785,6 +808,9 @@ void SunCamMgr::handleReply(Mode::T reported, const U8* payload, U16 length) {
 
 void SunCamMgr::sendSetupStep(SetupStep::T step) {
     this->m_setupStep = step;
+    if ((step == SetupStep::SET_EXPOSURE) && !this->takeExposureParameter()) {
+        return;
+    }
     bool sent = false;
     switch (step) {
         case SetupStep::PING_MCU:
@@ -794,28 +820,15 @@ void SunCamMgr::sendSetupStep(SetupStep::T step) {
             sent = this->sendFrame(CMD_PING, static_cast<U8>(PingType::MCU_AND_SENSOR), 0, 0, 0);
             break;
         case SetupStep::SET_MODE: {
-            Fw::ParamValid valid;
-            const CaptureMode mode = this->paramGet_CAMERA_MODE(valid);
-            sent = this->sendFrame(CMD_SET_MODE, static_cast<U8>(mode.e), 0, 0, 0);
+            Fw::ParamValid valid;  // an INVALID parameter reads as its FPP default, which is a legal mode
+            this->m_modeSent = this->paramGet_CAMERA_MODE(valid);
+            sent = this->sendFrame(CMD_SET_MODE, static_cast<U8>(this->m_modeSent.e), 0, 0, 0);
             break;
         }
-        case SetupStep::SET_EXPOSURE: {
-            Fw::ParamValid valid;
-            const U16 exposure = this->paramGet_EXPOSURE(valid);
-            if (!this->exposureInRange(exposure)) {
-                if (this->m_operation == Operation::SETUP_CAMERA) {
-                    this->log_WARNING_HI_SetupFailed(SetupStep::SET_EXPOSURE, FailCause::OUT_OF_RANGE);
-                    this->setSetupState(SetupState::NOT_SETUP);
-                    this->respond(Fw::CmdResponse::EXECUTION_ERROR);
-                }
-                // a refused push ends without a frame; the applied value stands and READY is kept
-                this->endOperation();
-                return;
-            }
-            this->m_exposureSent = exposure;
-            sent = this->sendFrame(CMD_SET_EXPOSURE, highByte(exposure), lowByte(exposure), 0, 0);
+        case SetupStep::SET_EXPOSURE:
+            sent =
+                this->sendFrame(CMD_SET_EXPOSURE, highByte(this->m_exposureSent), lowByte(this->m_exposureSent), 0, 0);
             break;
-        }
         case SetupStep::READ_EXPOSURE:
             sent = this->sendFrame(CMD_READ_REGISTER, highByte(EXPOSURE_REGISTER), lowByte(EXPOSURE_REGISTER), 0, 0);
             break;
@@ -828,11 +841,26 @@ void SunCamMgr::sendSetupStep(SetupStep::T step) {
     }
 }
 
+bool SunCamMgr::takeExposureParameter() {
+    Fw::ParamValid valid;  // an INVALID parameter reads as its FPP default, which is in range
+    const U16 exposure = this->paramGet_EXPOSURE(valid);
+    if (this->exposureInRange(exposure)) {
+        this->m_exposureSent = exposure;
+        return true;
+    }
+    if (this->m_operation == Operation::SETUP_CAMERA) {
+        this->log_WARNING_HI_SetupFailed(SetupStep::SET_EXPOSURE, FailCause::OUT_OF_RANGE);
+        this->setSetupState(SetupState::NOT_SETUP);
+        this->respond(Fw::CmdResponse::EXECUTION_ERROR);
+    }
+    // a refused push ends without a frame; the applied value stands and READY is kept
+    this->endOperation();
+    return false;
+}
+
 void SunCamMgr::finishSetupOrPush() {
     if (this->m_operation == Operation::SETUP_CAMERA) {
-        Fw::ParamValid valid;
-        const CaptureMode mode = this->paramGet_CAMERA_MODE(valid);
-        this->log_ACTIVITY_HI_SetupComplete(mode, this->m_exposureSent);
+        this->log_ACTIVITY_HI_SetupComplete(this->m_modeSent, this->m_exposureSent);
         this->setSetupState(SetupState::READY);
         this->respond(Fw::CmdResponse::OK);
     }
@@ -849,7 +877,7 @@ bool SunCamMgr::exposureInRange(U16 exposure) {
     return true;
 }
 
-void SunCamMgr::handleMemoryStatusForDownload(const MemorySlots& slots) {
+void SunCamMgr::handleMemoryStatusForDownload(const MemorySlots& slots, Mode::T reported) {
     if (this->m_abortRequested) {
         this->finishDownload(false);
         return;
@@ -891,7 +919,7 @@ void SunCamMgr::handleMemoryStatusForDownload(const MemorySlots& slots) {
         this->m_downloadSlot == this->m_downloadFirstSlot ? this->m_downloadSlot : this->m_downloadFirstSlot,
         this->m_downloadImageMode, this->m_downloadResolution,
         static_cast<U16>(this->m_pixelsPerLine * quadrantsPerSide),
-        static_cast<U16>(this->m_linesPerSlot * quadrantsPerSide), this->m_commandedMode, this->m_linesExpected);
+        static_cast<U16>(this->m_linesPerSlot * quadrantsPerSide), reported, this->m_linesExpected);
     const FwSizeType dataSize =
         SIZE_OF_ImageHeader_RECORD + static_cast<FwSizeType>(this->m_linesExpected) *
                                          SIZE_OF_ImageLine_RECORD(LINE_RECORD_PREFIX + this->m_pixelsPerLine);
@@ -957,12 +985,17 @@ void SunCamMgr::finishDownload(bool complete) {
     } else {
         this->log_ACTIVITY_HI_DownloadAborted(this->m_downloadSlot, this->m_linesReceived);
     }
+    this->closeDownload(Fw::CmdResponse::OK);
+}
+
+void SunCamMgr::closeDownload(Fw::CmdResponse::T response) {
     if (this->m_downloadPhase == DL_LINES) {
+        // a product exists once the header was stored: the lines received so far are delivered
         this->dpSend(this->m_container);
         this->m_productsSent++;
         this->tlmWrite_ProductsSent(this->m_productsSent);
     }
-    this->respond(Fw::CmdResponse::OK);
+    this->respond(response);
     if (this->m_abortRequested) {
         this->cmdResponse_out(this->m_abortOpCode, this->m_abortCmdSeq, Fw::CmdResponse::OK);
     }
@@ -971,17 +1004,7 @@ void SunCamMgr::finishDownload(bool complete) {
 
 void SunCamMgr::failDownload(DownloadFailCause::T cause) {
     this->log_WARNING_HI_DownloadFailed(this->m_downloadSlot, this->m_linesReceived, cause);
-    if (this->m_downloadPhase == DL_LINES) {
-        // the lines received so far are still delivered
-        this->dpSend(this->m_container);
-        this->m_productsSent++;
-        this->tlmWrite_ProductsSent(this->m_productsSent);
-    }
-    this->respond(Fw::CmdResponse::EXECUTION_ERROR);
-    if (this->m_abortRequested) {
-        this->cmdResponse_out(this->m_abortOpCode, this->m_abortCmdSeq, Fw::CmdResponse::OK);
-    }
-    this->endOperation();
+    this->closeDownload(Fw::CmdResponse::EXECUTION_ERROR);
 }
 
 // ----------------------------------------------------------------------

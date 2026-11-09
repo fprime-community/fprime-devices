@@ -141,7 +141,9 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     // ----------------------------------------------------------------------
 
     //! Admit a command: false (and the response/rejection sent) when it is refused
-    bool acceptCommand(FwOpcodeType opCode, U32 cmdSeq, Operation::T operation, bool needsReady);
+    //! Table 2 "Needs READY" column
+    enum class Admission { ANY_STATE, READY_ONLY };
+    bool acceptCommand(FwOpcodeType opCode, U32 cmdSeq, Operation::T operation, Admission admission);
 
     //! Record a drop counted by a queue-full hook
     void countDrop(QueueInput::T source);
@@ -162,7 +164,7 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     //! Send one 7-byte command frame and arm the reply timeout; false when the driver refused it
     bool sendFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4);
 
-    //! Reply timeout, 0xFF reply, mode mismatch or send failure of the exchange in progress
+    //! Reply timeout, 0xFF reply, mode or exposure-readback mismatch, or send failure of the exchange in progress
     void exchangeFailed(FailCause::T cause);
 
     //! Append received bytes to the assembler and process every complete reply
@@ -190,11 +192,16 @@ class SunCamMgr final : public SunCamMgrComponentBase {
 
     //! Check EXPOSURE against EXPOSURE_MIN..EXPOSURE_MAX; emits SettingRejected when it fails
     bool exposureInRange(U16 exposure);
+    //! Read the EXPOSURE parameter into m_exposureSent; false (operation ended) when it is out of range
+    bool takeExposureParameter();
 
-    void handleMemoryStatusForDownload(const MemorySlots& slots);
+    //! Start the line phase from the Memory Status reply (reported = its mode byte, stored in the header)
+    void handleMemoryStatusForDownload(const MemorySlots& slots, Mode::T reported);
     void requestLine();
     void storeLine(const U8* payload, U16 length);
     void finishDownload(bool complete);
+    //! Shared tail of finishDownload/failDownload: deliver the product when one exists, answer, end the operation
+    void closeDownload(Fw::CmdResponse::T response);
     void failDownload(DownloadFailCause::T cause);
 
     // ----------------------------------------------------------------------
@@ -224,6 +231,8 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     // Set-up and parameter push
     SetupStep::T m_setupStep;
     U16 m_exposureSent;
+    //! CAMERA_MODE value pushed by the set-up in progress (reported by SetupComplete)
+    CaptureMode m_modeSent;
     PingType::T m_pingType;
 
     // Capture

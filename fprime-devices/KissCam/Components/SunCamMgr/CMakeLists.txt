@@ -18,7 +18,5 @@ register_fprime_ut(
     SOURCES
         "${CMAKE_CURRENT_LIST_DIR}/test/ut/SunCamMgrTestMain.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/test/ut/SunCamMgrTester.cpp"
-    DEPENDS
-        STest
     UT_AUTO_HELPERS
 )

@@ -81,7 +81,7 @@ Table 3 — Telemetry
 | Exposure | U16 | EXPOSURE value whose Set Exposure was acknowledged; Capture reply exposure |
 | ExposureReadback | U16 | Read Register 0x3012 reply |
 | CameraUptime | U16 s | Ping reply |
-| RegisterValue | {address, value} | Read Register reply |
+| RegisterValue | {address, value} | READ_REGISTER command reply |
 | CameraValidCmds, CameraInvalidCmds | U8 | Ping / error replies |
 | MemorySlots | array[4] of {mode (same enum), exposure, uptime} | Memory Status reply |
 | LastCameraError | {command, errorType, count} | error reply |
@@ -96,7 +96,7 @@ Table 4 — Constants and data-product records
 | LINE_RETRIES | 3 (configurable) | re-requests of one image line before the download fails |
 | TLM_PERIOD_TICKS | 10 (configurable) | `run` ticks between periodic writes of the component state and counter channels (1 s at 10 Hz) |
 | EXPOSURE_MIN, EXPOSURE_MAX | 2, 960 | EXPOSURE values the component sends (datasheet §7.4.4) |
-| ImageHeader record | slot, imageMode, resolution, width, height, cameraMode, linesExpected | first record of every image product; `imageMode` = the slot's Memory Status mode (SD: one slot, HD: four quadrant slots); `cameraMode` = mode byte of the Download replies; width × height = 640×480 / 80×60 (SD), 1280×960 / 160×120 (HD) |
+| ImageHeader record | slot, imageMode, resolution, width, height, cameraMode, linesExpected | first record of every image product; `imageMode` = the slot's Memory Status mode (SD: one slot, HD: four quadrant slots); `cameraMode` = mode byte of the Memory Status reply that started the download (every Download reply is checked against the commanded mode); width × height = 640×480 / 80×60 (SD), 1280×960 / 160×120 (HD) |
 | ImageLine record | U8 array: slot (1 byte), line number (2 bytes, MSB first), then 640 or 80 pixels | one record per line received, camera byte order; HD records run slot 1, 2, 3, 4 (quadrants top-left, top-right, bottom-left, bottom-right, datasheet Figure 3) |
 
 ## Design
@@ -144,7 +144,7 @@ the doc-comment; data-product records are Table 4 (`ImageHeader` struct, `ImageL
 | DownloadStarted(slot, imageMode, resolution, lines) | ACTIVITY_LO | Memory Status answered, image mode known, product allocated |
 | DownloadComplete(slot, imageMode, resolution, lines, bytes) | ACTIVITY_HI | last line stored, product sent |
 | DownloadAborted(slot, linesReceived) | ACTIVITY_HI | DOWNLOAD_ABORT ended the download; lines received delivered |
-| DownloadFailed(slot, linesReceived, cause) | WARNING_HI | download ended on a fault (LINE_FAILED, SEND_FAILED, PRODUCT_FULL, MEMORY_STATUS_FAILED, NO_IMAGE — slot holds no SD image or an incomplete HD image); lines received delivered when a product existed |
+| DownloadFailed(slot, linesReceived, cause) | WARNING_HI | download ended on a fault (LINE_FAILED, SEND_FAILED, PRODUCT_FULL, MEMORY_STATUS_FAILED, NO_IMAGE — slot holds no SD image or an incomplete HD image); lines received delivered when a product existed; a ModeMismatch during the line phase is reported as LINE_FAILED preceded by the ModeMismatch event |
 | LineRetry(line, attempt) | DIAGNOSTIC | a line is re-requested |
 | RegisterRead(address, value) | ACTIVITY_HI | Read Register acknowledged |
 | CommandRejected(operation, cause) | WARNING_LO | NOT_READY, BUSY, NO_DOWNLOAD; response EXECUTION_ERROR (BUSY for cause BUSY) |
@@ -158,7 +158,7 @@ the doc-comment; data-product records are Table 4 (`ImageHeader` struct, `ImageL
 
 ### Configure
 `KissCamConfig` is a `register_fprime_config` module; a deployment overrides `KissCamConfig.fpp` through its config
-directory. `run` is driven at 10 Hz so that REPLY_TIMEOUT_TICKS × period = 2 s (datasheet §7); a deployment with another
+directory. `run` is driven at 10 Hz so that REPLY_TIMEOUT_TICKS × period = 2 s (datasheet §7); the tick-counted timeout expires between (REPLY_TIMEOUT_TICKS − 1) and REPLY_TIMEOUT_TICKS periods after the send (1.9–2.0 s at 10 Hz); a deployment with another
 rate re-sets the constant to keep ≈ 2 s. The deployment opens the UART at 115200 8N1 with 1024-byte receive buffers.
 ```fpp
 constant REPLY_TIMEOUT_TICKS = 20   # run ticks per reply (2 s at 10 Hz)
@@ -188,14 +188,14 @@ response is deferred to the operation's end (durations and sequence timeouts: to
 is exempt from the mode check. Receive buffers with status OP_OK are appended to a component-local 648-byte assembler
 (rather than `Svc.FrameAccumulator`, whose `ComDataWithContext` ports would need an adapter and a second topology
 component), others are counted as discarded and returned when they carry data (a null notice has nothing to return), and a reply is complete when the length field (excluding the
-final 0x0D; image payloads may contain 0x0D) is satisfied. A complete reply is matched to the outstanding command byte and
+final 0x0D; image payloads may contain 0x0D) is satisfied. Bytes outside a frame, and a frame whose length field exceeds the assembler or whose last byte is not 0x0D, are skipped up to the next 0x40 or the end of the receive buffer and reported as one `FrameDiscarded(MALFORMED)` carrying their count and first 8 bytes; a reply whose payload length, Memory Status mode bytes, error type or mode byte cannot be decoded is discarded the same way and the exchange stays pending. A complete reply is matched to the outstanding command byte and
 to every parameter it echoes (Download line number, Read Register address) — a mismatch, or a reply after its exchange
 timed out, is discarded (WRONG_COMMAND / NO_OPERATION; replies carry no sequence number, so a late reply to a re-sent
-command of the same byte and echo is indistinguishable) — then mode-checked and decoded into events and channels. `run`
+command of the same byte and echo is indistinguishable) — then mode-checked (against the mode just set for a Set Mode reply, otherwise the commanded mode) and decoded into events and channels. `run`
 ticks count a per-exchange timeout; on expiry or a 0xFF reply the exchange fails and the operation ends per the
 requirements (set-up/push → NOT_SETUP; download line → `LineRetry`, then `DownloadFailed`), while a download first runs
 Memory Status to learn the slot's image mode, allocates one product for the whole image (SD: the slot; HD: slots 1-4 in order,
-Figure 3 quadrants — an HD image is downloaded only when all four slots report HD with the same capture uptime (±1 s); a slot
+Figure 3 quadrants — an HD image is downloaded only when all four slots report HD with capture uptimes within 1 s of each other; a slot
 whose stored mode is not SD, or an HD set that fails that check, ends the download with `DownloadFailed(NO_IMAGE)` before any
 product is allocated, REQ-032), adds one `ImageLine` record (slot, line, pixels) per reply and sends the product on completion,
 `DownloadAborted` (commanded, ACTIVITY_HI) or `DownloadFailed` (WARNING_HI). EXPOSURE is range-checked by the component:
@@ -203,12 +203,12 @@ a value outside EXPOSURE_MIN..EXPOSURE_MAX is refused with one `SettingRejected`
 flag, the next PRM_SET re-arms it; the applied value stands, READY is kept), and at set-up it fails the SET_EXPOSURE step
 locally — `SettingRejected(EXPOSURE, value, min, max)` then `SetupFailed(SET_EXPOSURE, OUT_OF_RANGE)`, NOT_SETUP — before Set
 Exposure is sent. DOWNLOAD answers OK on `DownloadComplete` and on a commanded `DownloadAborted` (the partial product was
-delivered), EXECUTION_ERROR on `DownloadFailed`; DOWNLOAD_ABORT answers OK once the download has stopped.
+delivered; an abort during Memory Status ends the download without a product), EXECUTION_ERROR on `DownloadFailed`; DOWNLOAD_ABORT answers OK once the download has stopped (also when it stopped on `DownloadFailed`), and a second DOWNLOAD_ABORT while one is pending is refused BUSY. `DownloadComplete.bytes` is the record bytes of the product (header record plus line records).
 
 Tick path: `run` (sync, rate-group thread) test-and-sets the atomic `m_runQueued` and, when it was clear, invokes
 `runInternal`, whose handler and queue-full hook both clear it — the queue never holds more than one tick (the pattern of
-`Svc.EventManager`/`Svc.FileManager`). `parameterUpdated` only sets a guarded dirty flag; `SETUP_CAMERA` applies the stored CAMERA_MODE and EXPOSURE and clears that
-flag (a parameter changed while NOT_SETUP is never pushed on its own); the `runInternal` handler pushes while idle (`CAMERA_MODE`, then `EXPOSURE` + readback), and on its first tick
+`Svc.EventManager`/`Svc.FileManager`). `parameterUpdated` only sets a mutex-guarded dirty flag, one per Table 1 parameter; `SETUP_CAMERA` applies the stored CAMERA_MODE and EXPOSURE and clears both
+flags (a parameter changed while NOT_SETUP is never pushed on its own); the `runInternal` handler pushes the dirty parameters while idle (`CAMERA_MODE` then `EXPOSURE` + readback; an EXPOSURE-only change pushes `EXPOSURE` + readback), and on its first tick
 the component reports SetupState NOT_SETUP, CurrentOperation NONE and zero counters and re-writes the component state and counter channels (SetupState, CurrentOperation, nine U32 counters) every `TLM_PERIOD_TICKS` ticks (1 Hz at the 10 Hz rate) as well as on change; camera-sourced channels are written on reply only. Replies are parsed by length within the 648-byte assembler; the exposure readback is compared with the value sent.
 
 ### Data product

@@ -124,7 +124,6 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
     //! Initialize components
     void initComponents();
 
-    //! Dispatch every queued message
     //! Dispatch exactly `count` queued messages (doDispatch blocks on an empty queue)
     void dispatch(U32 count = 1);
 
@@ -166,6 +165,8 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
 
     //! Send SETUP_CAMERA and dispatch it
     void sendSetup(U32 cmdSeq = 0);
+    //! Fill the queue with health pings, overflow every input once, drain, tick (four QueueOverflow events)
+    void overflowCycle();
     //! Data size of an Image container: one header record and one line record (slot, line, pixels) per line
     static FwSizeType imageDataSize(FwSizeType lines, FwSizeType pixels);
     //! Clear the histories, remembering the last SetupState written (the channel is written on change)

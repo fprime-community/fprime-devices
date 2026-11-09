@@ -226,6 +226,21 @@ FwSizeType SunCamMgrTester::imageDataSize(FwSizeType lines, FwSizeType pixels) {
     return SunCamMgr::SIZE_OF_ImageHeader_RECORD + lines * SunCamMgr::SIZE_OF_ImageLine_RECORD(pixels + 3);
 }
 
+void SunCamMgrTester::overflowCycle() {
+    for (U32 i = 0; i < TEST_INSTANCE_QUEUE_DEPTH; i++) {
+        this->invoke_to_pingIn(0, i);
+    }
+    this->sendCmd_SLEEP(0, 300);
+    const U8 bytes[1] = {0x55};
+    ::memcpy(this->m_rxStore, bytes, sizeof bytes);
+    Fw::Buffer buffer(this->m_rxStore, sizeof bytes);
+    this->invoke_to_drvReceiveIn(0, buffer, Drv::ByteStreamStatus::OP_OK);
+    this->invoke_to_run(0, 0);
+    this->invoke_to_pingIn(0, 99);
+    this->dispatch(TEST_INSTANCE_QUEUE_DEPTH);
+    this->tick();
+}
+
 void SunCamMgrTester::sendSetup(U32 cmdSeq) {
     this->sendCmd_SETUP_CAMERA(0, cmdSeq);
     this->dispatch();
@@ -677,7 +692,8 @@ void SunCamMgrTester::testCommandFrameBytes() {
     for (U16 line = 0; line < 0x0100; line++) {
         this->lineReply(line, FULL_PIXELS, static_cast<U8>(line), MODE_HD);
     }
-    this->assertFrame(CMD_DOWNLOAD, 0x01, 0x00, 0x01, 0x00, this->m_frameCount);
+    this->assertFrame(CMD_DOWNLOAD, 0x01, 0x00, 0x01, 0x00,
+                      329u);  // 71 after the preview abort, Memory Status, requests for lines 0..256
 }
 
 void SunCamMgrTester::testChannelsFromReplies() {
@@ -719,7 +735,7 @@ void SunCamMgrTester::testChannelsFromReplies() {
     ASSERT_TLM_LastCameraError(0, CameraErrorInfo(CMD_READ_REGISTER, ErrorType::INVALID_PARAMETER, 9));
     ASSERT_TLM_CameraInvalidCmds(1, 9);
     ASSERT_EQ(this->tlmHistory_CameraErrors->at(this->tlmHistory_CameraErrors->size() - 1).arg, 1u);
-    ASSERT_EQ(this->tlmHistory_Exchanges->at(this->tlmHistory_Exchanges->size() - 1).arg, 9u);
+    ASSERT_EQ(this->tlmHistory_Exchanges->at(this->tlmHistory_Exchanges->size() - 1).arg, 8u);
 }
 
 void SunCamMgrTester::testOutcomeEventPerCommand() {
@@ -1144,6 +1160,16 @@ void SunCamMgrTester::testMalformedAndStrayFrames() {
     ASSERT_EVENTS_DownloadFailed_SIZE(0);
     this->lineReply(0, PREVIEW_PIXELS, 0);
     ASSERT_EQ(this->tlmHistory_LinesDownloaded->at(this->tlmHistory_LinesDownloaded->size() - 1).arg, 1u);
+    // FrameDiscarded is throttled after ten; SETUP_CAMERA clears the throttle
+    ASSERT_EVENTS_FrameDiscarded_SIZE(10);
+    for (U16 line = 1; line < PREVIEW_LINES; line++) {
+        this->lineReply(line, PREVIEW_PIXELS, 0);
+    }
+    ASSERT_EVENTS_DownloadComplete_SIZE(1);
+    this->sendSetup(5);
+    this->ack(CMD_SET_MODE);  // not the reply to the pending Ping
+    ASSERT_EVENTS_FrameDiscarded_SIZE(11);
+    ASSERT_EVENTS_FrameDiscarded(10, DiscardCause::WRONG_COMMAND, 6, head(0x40, 0x4D, 0x01, 0x00, 0x00, 0x0D, 0, 0));
 }
 
 void SunCamMgrTester::testSplitAndCrPayloadReply() {
@@ -1388,6 +1414,19 @@ void SunCamMgrTester::testQueueFullHooks() {
     ASSERT_EQ(this->tlmHistory_QueueOverflows->at(this->tlmHistory_QueueOverflows->size() - 1).arg, 14u);
     this->tick();
     ASSERT_EVENTS_QueueOverflow_SIZE(4);
+    // QueueOverflow is throttled after ten; SETUP_CAMERA clears the throttle
+    this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS);  // the accepted PING times out: no operation in progress
+    this->clearHistory();
+    for (U32 cycle = 0; cycle < 3; cycle++) {
+        this->overflowCycle();
+    }
+    ASSERT_EVENTS_QueueOverflow_SIZE(6);  // 16 fired since boot, the throttle stops at 10 (4 before clearHistory)
+    ASSERT_EQ(this->tlmHistory_QueueOverflows->at(this->tlmHistory_QueueOverflows->size() - 1).arg, 14u + 12u);
+    this->sendSetup(200);
+    this->clearHistory();
+    this->overflowCycle();
+    ASSERT_EVENTS_QueueOverflow_SIZE(4);
+    ASSERT_EVENTS_QueueOverflow(0, QueueInput::COMMAND, 1);
 }
 
 void SunCamMgrTester::testPeriodicChannelWrite() {
@@ -1419,7 +1458,7 @@ void SunCamMgrTester::testPeriodicChannelWrite() {
     ASSERT_TLM_SetupState_SIZE(1);
     ASSERT_TLM_SetupState(0, SetupState::SETTING_UP);
     ASSERT_TLM_CurrentOperation(0, Operation::SETUP_CAMERA);
-    ASSERT_TLM_Exchanges(0, 1);
+    ASSERT_TLM_Exchanges_SIZE(0);  // counted on acknowledgement, not on send
 }
 
 void SunCamMgrTester::testExposureRangeCheck() {
