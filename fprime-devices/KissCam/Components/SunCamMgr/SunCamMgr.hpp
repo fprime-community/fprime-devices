@@ -52,7 +52,7 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     // ----------------------------------------------------------------------
 
     //! Construct SunCamMgr object
-    SunCamMgr(const char* const compName  //!< The component name
+    explicit SunCamMgr(const char* const compName  //!< The component name
     );
 
     //! Destroy SunCamMgr object
@@ -140,9 +140,10 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     // Command admission and operation bookkeeping
     // ----------------------------------------------------------------------
 
-    //! Admit a command: false (and the response/rejection sent) when it is refused
     //! Table 2 "Needs READY" column
     enum class Admission { ANY_STATE, READY_ONLY };
+
+    //! Admit a command: false (and the response/rejection sent) when it is refused
     bool acceptCommand(FwOpcodeType opCode, U32 cmdSeq, Operation::T operation, Admission admission);
 
     //! Record a drop counted by a queue-full hook
@@ -232,7 +233,7 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     SetupStep::T m_setupStep;
     U16 m_exposureSent;
     //! CAMERA_MODE value pushed by the set-up in progress (reported by SetupComplete)
-    CaptureMode m_modeSent;
+    CaptureMode::T m_modeSent;
     PingType::T m_pingType;
 
     // Capture

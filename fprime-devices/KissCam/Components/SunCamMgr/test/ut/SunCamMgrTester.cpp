@@ -47,6 +47,7 @@ SunCamMgrTester::SunCamMgrTester()
       m_productGetStatus(Fw::Success::SUCCESS) {
     ::memset(this->m_lastFrame, 0, sizeof this->m_lastFrame);
     ::memset(this->m_rxStore, 0, sizeof this->m_rxStore);
+    ::memset(this->m_dpStore, 0, sizeof this->m_dpStore);
     this->initComponents();
     this->connectPorts();
     this->component.loadParameters();
@@ -366,6 +367,17 @@ void SunCamMgrTester::testSetupNominal() {
     ASSERT_TLM_ExposureReadback(0, DEFAULT_EXPOSURE);
     ASSERT_EQ(this->tlmHistory_Exchanges->at(this->tlmHistory_Exchanges->size() - 1).arg, 5u);
     ASSERT_EQ(this->m_frameCount, 5u);
+    // SetupComplete reports the mode that was pushed, not the parameter value at completion
+    this->clearHistory();
+    this->sendSetup(7);
+    this->pingReply(1, 0, 5, MODE_SLEEP);
+    this->ack(CMD_SET_MODE);
+    this->setCameraMode(CaptureMode::HD);
+    this->ack(CMD_SET_EXPOSURE);
+    this->registerReply(EXPOSURE_REGISTER, DEFAULT_EXPOSURE);
+    this->pingReply(5, 0, 6);
+    ASSERT_EVENTS_SetupComplete_SIZE(1);
+    ASSERT_EVENTS_SetupComplete(0, CaptureMode::SD, DEFAULT_EXPOSURE);
 }
 
 void SunCamMgrTester::testSetupFailsEachStep() {
@@ -619,6 +631,7 @@ void SunCamMgrTester::testExposureReadbackMismatch() {
     ASSERT_EVENTS_SetupFailed(0, SetupStep::READ_EXPOSURE, FailCause::EXPOSURE_MISMATCH);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_SETUP_CAMERA, 1, Fw::CmdResponse::EXECUTION_ERROR);
     ASSERT_EQ(this->m_frameCount, 4u);
+    this->assertSetupState(SetupState::NOT_SETUP);
     // on a push
     this->setupNominal();
     this->setExposure(50);
@@ -1058,6 +1071,34 @@ void SunCamMgrTester::testReplyTimeoutTicks() {
     // the timeout counter restarts per exchange
     this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS * 2);
     ASSERT_EVENTS_ReplyTimeout_SIZE(0);
+    // a reply left incomplete when the exchange times out is discarded and does not frame the next reply
+    this->clearHistory();
+    this->sendCmd_PING(0, 3, PingType::MCU);
+    this->dispatch();
+    const U8 partial[5] = {0x40, 0x50, 0x01, 0x00, 0x04};
+    this->receive(partial, sizeof partial, Drv::ByteStreamStatus::OP_OK);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(0);
+    this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS);
+    ASSERT_EVENTS_ReplyTimeout_SIZE(1);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(1);
+    ASSERT_EVENTS_FrameDiscarded(0, DiscardCause::MALFORMED, 5, head(0x40, 0x50, 0x01, 0x00, 0x04, 0, 0, 0));
+    ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_PING, 3, Fw::CmdResponse::EXECUTION_ERROR);
+    this->clearHistory();
+    this->sendCmd_PING(0, 4, PingType::MCU);
+    this->dispatch();
+    this->pingReply(1, 0, 1);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(0);
+    ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_PING, 4, Fw::CmdResponse::OK);
+    // a fragment received while idle is discarded when the next exchange starts
+    this->clearHistory();
+    this->receive(partial, sizeof partial, Drv::ByteStreamStatus::OP_OK);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(0);
+    this->sendCmd_PING(0, 5, PingType::MCU);
+    this->dispatch();
+    ASSERT_EVENTS_FrameDiscarded_SIZE(1);
+    ASSERT_EVENTS_FrameDiscarded(0, DiscardCause::NO_OPERATION, 5, head(0x40, 0x50, 0x01, 0x00, 0x04, 0, 0, 0));
+    this->pingReply(1, 0, 1);
+    ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_PING, 5, Fw::CmdResponse::OK);
 }
 
 void SunCamMgrTester::testCameraErrorReply() {

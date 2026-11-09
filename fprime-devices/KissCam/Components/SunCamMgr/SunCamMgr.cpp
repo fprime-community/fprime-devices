@@ -14,7 +14,6 @@ namespace KissCam {
 
 static_assert(KissCamConfig::REPLY_TIMEOUT_TICKS > 0, "a reply must be allowed at least one run tick");
 static_assert(KissCamConfig::TLM_PERIOD_TICKS > 0, "the periodic channel write divides the tick count");
-static_assert(KissCamConfig::LINE_RETRIES > 0, "a line must be requested at least once");
 
 namespace {
 
@@ -283,7 +282,7 @@ void SunCamMgr::runInternal_internalInterfaceHandler() {
     this->m_runQueued = false;
 
     // Drops counted by the queue-full hooks since the last tick
-    U32 drops[QueueInput::NUM_CONSTANTS] = {0, 0, 0, 0};
+    U32 drops[QueueInput::NUM_CONSTANTS] = {};
     {
         Os::ScopeLock lock(this->m_lock);
         ::memcpy(drops, this->m_drops, sizeof drops);
@@ -472,6 +471,12 @@ void SunCamMgr::setOperation(Operation::T operation) {
 
 bool SunCamMgr::sendFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4) {
     FW_ASSERT(this->m_pendingCmd == 0, this->m_pendingCmd);
+    if (this->m_rxLen > 0) {
+        // a fragment received while no exchange was pending can only be noise or a late reply
+        this->discard(DiscardCause::NO_OPERATION, this->m_rx, FW_MIN(this->m_rxLen, FRAME_HEAD_SIZE),
+                      static_cast<U32>(this->m_rxLen));
+        this->m_rxLen = 0;
+    }
     this->m_txFrame[0] = FRAME_START;
     this->m_txFrame[1] = cmd;
     this->m_txFrame[2] = p1;
@@ -502,7 +507,6 @@ void SunCamMgr::exchangeFailed(FailCause::T cause) {
                       static_cast<U32>(this->m_rxLen));
         this->m_rxLen = 0;
     }
-    this->m_strayCount = 0;
     switch (this->m_operation) {
         case Operation::SETUP_CAMERA:
             this->log_WARNING_HI_SetupFailed(this->m_setupStep, cause);
@@ -669,7 +673,7 @@ void SunCamMgr::processReply(const U8* frame, FwSizeType size) {
     }
     U16 expected = 0;
     if (cmd == CMD_DOWNLOAD) {
-        // line echo then pixels; a wrong pixel count is caught by the product record size
+        // line echo then pixels; the pixel count is not checked (the SDD specifies no such check)
         if (length < 2) {
             this->discard(DiscardCause::MALFORMED, frame, headSize, bytes);
             return;
@@ -821,8 +825,8 @@ void SunCamMgr::sendSetupStep(SetupStep::T step) {
             break;
         case SetupStep::SET_MODE: {
             Fw::ParamValid valid;  // an INVALID parameter reads as its FPP default, which is a legal mode
-            this->m_modeSent = this->paramGet_CAMERA_MODE(valid);
-            sent = this->sendFrame(CMD_SET_MODE, static_cast<U8>(this->m_modeSent.e), 0, 0, 0);
+            this->m_modeSent = this->paramGet_CAMERA_MODE(valid).e;
+            sent = this->sendFrame(CMD_SET_MODE, static_cast<U8>(this->m_modeSent), 0, 0, 0);
             break;
         }
         case SetupStep::SET_EXPOSURE:
@@ -852,8 +856,9 @@ bool SunCamMgr::takeExposureParameter() {
         this->log_WARNING_HI_SetupFailed(SetupStep::SET_EXPOSURE, FailCause::OUT_OF_RANGE);
         this->setSetupState(SetupState::NOT_SETUP);
         this->respond(Fw::CmdResponse::EXECUTION_ERROR);
+    } else {
+        // a refused push ends without a frame; the applied value stands and READY is kept
     }
-    // a refused push ends without a frame; the applied value stands and READY is kept
     this->endOperation();
     return false;
 }
@@ -892,15 +897,17 @@ void SunCamMgr::handleMemoryStatusForDownload(const MemorySlots& slots, Mode::T 
         slotCount = 1;
     } else if (slotMode == Mode::HD) {
         // one HD image spans the four slots, captured together
-        U16 minUptime = slots[0].get_uptime();
-        U16 maxUptime = minUptime;
+        const U16 firstUptime = slots[0].get_uptime();
+        bool uptimesAgree = true;
         bool allHd = true;
         for (FwSizeType i = 0; i < SLOT_COUNT; i++) {
             allHd = allHd && (slots[i].get_mode() == Mode::HD);
-            minUptime = FW_MIN(minUptime, slots[i].get_uptime());
-            maxUptime = FW_MAX(maxUptime, slots[i].get_uptime());
+            // the 16-bit uptime wraps: either direction of the difference must be within the window
+            const U16 ahead = static_cast<U16>(slots[i].get_uptime() - firstUptime);
+            const U16 behind = static_cast<U16>(firstUptime - slots[i].get_uptime());
+            uptimesAgree = uptimesAgree && (FW_MIN(ahead, behind) <= HD_UPTIME_WINDOW);
         }
-        if (allHd && ((maxUptime - minUptime) <= HD_UPTIME_WINDOW)) {
+        if (allHd && uptimesAgree) {
             this->m_downloadImageMode = Mode::HD;
             this->m_downloadFirstSlot = Slot::SLOT_1;
             slotCount = SLOT_COUNT;
@@ -915,11 +922,10 @@ void SunCamMgr::handleMemoryStatusForDownload(const MemorySlots& slots, Mode::T 
     this->m_pixelsPerLine = preview ? PREVIEW_PIXELS : FULL_PIXELS;
     this->m_linesExpected = static_cast<U16>(this->m_linesPerSlot * slotCount);
     const U16 quadrantsPerSide = (slotCount == SLOT_COUNT) ? 2 : 1;
-    const ImageHeader header(
-        this->m_downloadSlot == this->m_downloadFirstSlot ? this->m_downloadSlot : this->m_downloadFirstSlot,
-        this->m_downloadImageMode, this->m_downloadResolution,
-        static_cast<U16>(this->m_pixelsPerLine * quadrantsPerSide),
-        static_cast<U16>(this->m_linesPerSlot * quadrantsPerSide), reported, this->m_linesExpected);
+    const ImageHeader header(this->m_downloadFirstSlot, this->m_downloadImageMode, this->m_downloadResolution,
+                             static_cast<U16>(this->m_pixelsPerLine * quadrantsPerSide),
+                             static_cast<U16>(this->m_linesPerSlot * quadrantsPerSide), reported,
+                             this->m_linesExpected);
     const FwSizeType dataSize =
         SIZE_OF_ImageHeader_RECORD + static_cast<FwSizeType>(this->m_linesExpected) *
                                          SIZE_OF_ImageLine_RECORD(LINE_RECORD_PREFIX + this->m_pixelsPerLine);
