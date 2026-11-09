@@ -177,6 +177,9 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     //! Account for a discarded frame
     void discard(DiscardCause::T cause, const U8* bytes, FwSizeType headSize, U32 totalBytes);
 
+    //! Discard whatever the reply assembler holds (a frame that never completed)
+    void discardPartialFrame(DiscardCause::T cause);
+
     //! Validate a complete reply against the exchange in progress, then decode it
     void processReply(const U8* frame, FwSizeType size);
 

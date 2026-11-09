@@ -471,12 +471,8 @@ void SunCamMgr::setOperation(Operation::T operation) {
 
 bool SunCamMgr::sendFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4) {
     FW_ASSERT(this->m_pendingCmd == 0, this->m_pendingCmd);
-    if (this->m_rxLen > 0) {
-        // a fragment received while no exchange was pending can only be noise or a late reply
-        this->discard(DiscardCause::NO_OPERATION, this->m_rx, FW_MIN(this->m_rxLen, FRAME_HEAD_SIZE),
-                      static_cast<U32>(this->m_rxLen));
-        this->m_rxLen = 0;
-    }
+    // a fragment received while no exchange was pending can only be noise or a late reply
+    this->discardPartialFrame(DiscardCause::NO_OPERATION);
     this->m_txFrame[0] = FRAME_START;
     this->m_txFrame[1] = cmd;
     this->m_txFrame[2] = p1;
@@ -502,11 +498,7 @@ bool SunCamMgr::sendFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4) {
 void SunCamMgr::exchangeFailed(FailCause::T cause) {
     this->m_pendingCmd = 0;
     // a reply left incomplete by the failed exchange must not frame the next one
-    if (this->m_rxLen > 0) {
-        this->discard(DiscardCause::MALFORMED, this->m_rx, FW_MIN(this->m_rxLen, FRAME_HEAD_SIZE),
-                      static_cast<U32>(this->m_rxLen));
-        this->m_rxLen = 0;
-    }
+    this->discardPartialFrame(DiscardCause::MALFORMED);
     switch (this->m_operation) {
         case Operation::SETUP_CAMERA:
             this->log_WARNING_HI_SetupFailed(this->m_setupStep, cause);
@@ -611,6 +603,13 @@ void SunCamMgr::flushStray() {
         this->discard(DiscardCause::MALFORMED, this->m_strayHead,
                       FW_MIN(static_cast<FwSizeType>(this->m_strayCount), FRAME_HEAD_SIZE), this->m_strayCount);
         this->m_strayCount = 0;
+    }
+}
+
+void SunCamMgr::discardPartialFrame(DiscardCause::T cause) {
+    if (this->m_rxLen > 0) {
+        this->discard(cause, this->m_rx, FW_MIN(this->m_rxLen, FRAME_HEAD_SIZE), static_cast<U32>(this->m_rxLen));
+        this->m_rxLen = 0;
     }
 }
 
@@ -897,15 +896,17 @@ void SunCamMgr::handleMemoryStatusForDownload(const MemorySlots& slots, Mode::T 
         slotCount = 1;
     } else if (slotMode == Mode::HD) {
         // one HD image spans the four slots, captured together
-        const U16 firstUptime = slots[0].get_uptime();
         bool uptimesAgree = true;
         bool allHd = true;
         for (FwSizeType i = 0; i < SLOT_COUNT; i++) {
             allHd = allHd && (slots[i].get_mode() == Mode::HD);
-            // the 16-bit uptime wraps: either direction of the difference must be within the window
-            const U16 ahead = static_cast<U16>(slots[i].get_uptime() - firstUptime);
-            const U16 behind = static_cast<U16>(firstUptime - slots[i].get_uptime());
-            uptimesAgree = uptimesAgree && (FW_MIN(ahead, behind) <= HD_UPTIME_WINDOW);
+            // every pair of uptimes is within the window; the 16-bit uptime wraps, so the
+            // difference is taken in both directions
+            for (FwSizeType j = i + 1; j < SLOT_COUNT; j++) {
+                const U16 ahead = static_cast<U16>(slots[j].get_uptime() - slots[i].get_uptime());
+                const U16 behind = static_cast<U16>(slots[i].get_uptime() - slots[j].get_uptime());
+                uptimesAgree = uptimesAgree && (FW_MIN(ahead, behind) <= HD_UPTIME_WINDOW);
+            }
         }
         if (allHd && uptimesAgree) {
             this->m_downloadImageMode = Mode::HD;
