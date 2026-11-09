@@ -12,7 +12,10 @@ one other command/reply exchange; at most one operation is in progress at a time
 
 Device identity: KissCAM V2 Datasheet and User Manual, Revision 1.1 (April 2023). Bench unit on `/dev/ttyUSB0`
 (FTDI USB-RS422 cable FTAQMGVF): Ping reply `40 50 00 00 04 01 00 94 d1 0d` = ACK `P`, mode Sleep, 1 valid / 0 invalid
-commands, uptime 38097 s — the datasheet's §7.4.1 reply format. The datasheet's Write Register command is not used.
+commands, uptime 38097 s — the datasheet's §7.4.1 reply format. At power-on the unit emits exactly 21 unframed ASCII bytes,
+`4d 56 50 20 43 61 6d 65 72 61 20 56 32 20 52 53 34 32 32 0d 0a` = "MVP Camera V2 RS422\r\n" (bench capture 2026-11-09, H7): the
+product family and interface variant only — no firmware revision is reported in-band (no version field in any reply, no
+banner elsewhere). The datasheet's Write Register command is not used.
 
 Revision for hardware (2026-11-09). The approved design met the bench unit and lost on four points; the human ruled
 "it must be functional on the hardware we have": (1) no Memory Status before a download, (2) a 0-byte Capture ACK is
@@ -23,7 +26,8 @@ unrecognised command; H2 Capture ACK `40 43 <mode> 00 00 0D`, 0 payload bytes, i
 never an error), full 640 × 480; H4 the camera refuses nothing (Download slot 5 / line 480 / 481, Set Exposure 0, Capture
 slot 0, Read Register 0xFFFF all answer normal frames; reads past the end run into the next slot); H5 HD mode changes
 only the reply mode byte — an HD Capture writes one 640 × 480 / 64 × 48 slot, slots 2-3 keep their SD content, slot 4 is not
-guaranteed; H6 reply mode byte, Ping, Set Mode, Set Exposure, Read Register 0x3012, 115200 8N1 per datasheet. Where the
+guaranteed; H6 reply mode byte, Ping, Set Mode, Set Exposure, Read Register 0x3012, 115200 8N1 per datasheet; H7 power-on banner
+"MVP Camera V2 RS422\r\n" (21 unframed bytes, undocumented). Where the
 bench disagrees with the datasheet the bench is the truth; §Not supported on our hardware records each discrepancy.
 
 ## Requirements
@@ -49,7 +53,7 @@ bench disagrees with the datasheet the bench is the truth; §Not supported on ou
 | REQ-SunCamMgr-017 | A download ended early shall deliver lines received: ACTIVITY_HI event if commanded, WARNING_HI otherwise. | Unit Test |
 | REQ-SunCamMgr-018 | No reply within REPLY_TIMEOUT_TICKS `run` ticks shall fail the exchange with a WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-019 | A camera error reply shall raise a WARNING_HI event carrying command, error type and count. | Unit Test |
-| REQ-SunCamMgr-020 | Out-of-operation, malformed or wrong-command frames shall be discarded and counted with a WARNING_LO event. | Unit Test |
+| REQ-SunCamMgr-020 | Bytes outside a frame and out-of-operation, malformed or wrong-command frames shall be discarded and counted with a WARNING_LO event. | Unit Test |
 | REQ-SunCamMgr-021 | While READY, a reply whose mode ≠ commanded mode shall cause NOT_SETUP with a WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-022 | The component shall report the Table 3 telemetry from the source named for each channel. | Unit Test |
 | REQ-SunCamMgr-023 | Every command outcome and every Table 1 setting applied shall be reported by an event. | Unit Test |
@@ -202,7 +206,7 @@ response is deferred to the operation's end (durations and sequence timeouts: to
 is exempt from the mode check. Receive buffers with status OP_OK are appended to a component-local 648-byte assembler
 (rather than `Svc.FrameAccumulator`, whose `ComDataWithContext` ports would need an adapter and a second topology
 component), others are counted as discarded and returned when they carry data (a null notice has nothing to return), and a reply is complete when the length field (excluding the
-final 0x0D; image payloads may contain 0x0D) is satisfied. Bytes outside a frame, and a frame whose length field exceeds the assembler or whose last byte is not 0x0D, are skipped up to the next 0x40 or the end of the receive buffer and reported as one `FrameDiscarded(MALFORMED)` carrying their count and first 8 bytes; a reply left incomplete when its exchange times out is discarded `MALFORMED`; a Download reply whose payload is not the 2-byte line echo plus exactly the expected pixel count (640 full, 64 preview) is discarded `MALFORMED` and not stored, so the line fails by the reply timeout and is re-requested (REQ-SunCamMgr-016); and a fragment still in the assembler when the next exchange starts is discarded `NO_OPERATION`; a reply whose payload length, Memory Status mode bytes, error type or mode byte cannot be decoded is discarded the same way and the exchange stays pending. A complete reply is matched to the outstanding command byte and
+final 0x0D; image payloads may contain 0x0D) is satisfied. Bytes outside a frame (for example the unframed power-on banner, H7, which arrives whenever the camera is powered while the component is receiving), and a frame whose length field exceeds the assembler or whose last byte is not 0x0D, are skipped up to the next 0x40 or the end of the receive buffer and reported as one `FrameDiscarded(MALFORMED)` carrying their count and first 8 bytes; a reply left incomplete when its exchange times out is discarded `MALFORMED`; a Download reply whose payload is not the 2-byte line echo plus exactly the expected pixel count (640 full, 64 preview) is discarded `MALFORMED` and not stored, so the line fails by the reply timeout and is re-requested (REQ-SunCamMgr-016); and a fragment still in the assembler when the next exchange starts is discarded `NO_OPERATION`; a reply whose payload length, Memory Status mode bytes, error type or mode byte cannot be decoded is discarded the same way and the exchange stays pending. A complete reply is matched to the outstanding command byte and
 to every parameter it echoes (Download line number, Read Register address) — a mismatch, or a reply after its exchange
 timed out, is discarded (WRONG_COMMAND / NO_OPERATION; replies carry no sequence number, so a late reply to a re-sent
 command of the same byte and echo is indistinguishable) — then mode-checked (against the mode just set for a Set Mode reply, otherwise the commanded mode) and decoded into events and channels. A Capture ACK with no payload (bench, H2) is nominal: `CaptureComplete.exposure` is the
@@ -285,6 +289,7 @@ decision: the component is built for the hardware we have, not for the datasheet
 | HD image = four quadrant slots, 1280 × 960 | §6.2, Fig. 3, §7.4.5 | Only the reply mode byte changes (02); an HD Capture writes one 640 × 480 / 64 × 48 slot; slots 2-3 keep their SD content; slot 4 not guaranteed after an HD capture (H5) | Four-slot assembly dropped — option (a) below; an HD-mode image is one slot whose header `imageMode` is HD. REQ-032, the unit tests `testDownloadHdImage` / `testDownloadNoImage` (replaced by `testDownloadHdSingleSlot`) and `DownloadFailCause.NO_IMAGE` / `MEMORY_STATUS_FAILED` withdrawn. Operator note: after an HD capture re-capture slot 4 before trusting it. |
 | Camera-side parameter validation / error replies for bad slot, line, exposure, register | §7.4.9 (error types 2, 3) | Download slot 5 / line 480 / line 481, Set Exposure 0, Capture slot 0, Read Register 0xFFFF all answer normal frames; reads past the end run linearly into the next slot's memory (H4) | All range checks stay in the component (Slot enum, 480/48 line counts, EXPOSURE_MIN..MAX, REQ-031); `ErrorType.INVALID_PARAMETER` / `WRONG_MODE` kept for decoding (datasheet error types 2, 3) but no test can provoke them; L5-2 uses Memory Status instead of READ_REGISTER 0xFFFF |
 | Capture uptime per slot (Memory Status payload) | §7.4.3 | Not available (H1) | `ImageHeader` carries no uptime; `exposure` is the component's last pushed/read-back value |
+| Power-on banner (undocumented) | — (not in Rev 1.1) | 21 unframed ASCII bytes `4d 56 50 20 43 61 6d 65 72 61 20 56 32 20 52 53 34 32 32 0d 0a` = "MVP Camera V2 RS422\r\n" at camera power-on, then nothing; no firmware revision (H7, bench capture, camera power cycled by the human) | Treated as bytes outside a frame (REQ-020): skipped to the next 0x40, one `FrameDiscarded(MALFORMED, 21, "MVP Came…")`, `DiscardedBytes` += 21, no state change; unit test `testPowerOnBanner` with these exact bytes. No system test: reproducing it needs a camera power cycle, which only the human performs on request (bench rule: no hub power cycling) — recorded as a UT-only waiver in the plan. Identity: product family / interface variant only; firmware unidentifiable in-band |
 
 Memory Status: keep or remove (human decision at the gate). Recommendation: KEEP as a standalone command. Reasons: it is the only
 camera error this unit can be made to produce (H4), so it is the system-test stimulus for REQ-019 / L5-2; it costs one command
@@ -364,6 +369,7 @@ _Generated by `fth render-sdd-tests` from the plan — do not edit by hand; the 
 | testReplyTimeoutTicks | Exchange fails after exactly REPLY_TIMEOUT_TICKS run ticks; Timeouts channel | REQ-SunCamMgr-018 |
 | testCameraErrorReply | 0xFF reply → CameraError(operation, cmdByte, errorType, count), LastCameraError, CameraErrors | REQ-SunCamMgr-019 |
 | testMalformedAndStrayFrames | Bad length, wrong command byte, late reply, non-OK buffer → FrameDiscarded, DiscardedBytes, resync on 0x40 | REQ-SunCamMgr-020 |
+| testPowerOnBanner | The 21 power-on banner bytes (H7) idle and in the middle of a Ping exchange → one FrameDiscarded(MALFORMED, 21, head "MVP Came"), DiscardedBytes += 21, no assert, the following framed reply still parsed | REQ-SunCamMgr-020 |
 | testSplitAndCrPayloadReply | Reply split across buffers and containing 0x0D parsed by length | REQ-SunCamMgr-001, REQ-SunCamMgr-020 |
 | testModeMismatch | Reply mode ≠ commanded mode while READY → ModeMismatch, NOT_SETUP | REQ-SunCamMgr-021 |
 | testMemoryStatusAndRegister | MEMORY_STATUS answered per datasheet → MemorySlots; MEMORY_STATUS answered unrecognised command (bench, H1) → CameraError(MEMORY_STATUS, UNRECOGNISED_COMMAND), EXECUTION_ERROR, READY kept; READ_REGISTER → RegisterRead, RegisterValue, address echo checked | REQ-SunCamMgr-025 |
