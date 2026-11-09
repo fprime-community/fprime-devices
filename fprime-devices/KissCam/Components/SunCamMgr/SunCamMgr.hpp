@@ -40,6 +40,7 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     static constexpr U16 EXPOSURE_REGISTER = 0x3012;            //!< sensor register read back after an exposure push
     static constexpr U16 FULL_PIXELS = 640;                     //!< pixels per full-resolution line
     static constexpr U16 PREVIEW_PIXELS = 80;                   //!< pixels per preview line
+    static constexpr U16 LINE_ECHO_SIZE = 2;                    //!< line number echoed ahead of the pixels
     static constexpr U16 FULL_LINES = 480;                      //!< lines of a full-resolution slot
     static constexpr U16 PREVIEW_LINES = 60;                    //!< lines of a preview slot
     static constexpr U16 HD_UPTIME_WINDOW = 1;                  //!< seconds between the capture uptimes of one HD image

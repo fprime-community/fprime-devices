@@ -672,8 +672,9 @@ void SunCamMgr::processReply(const U8* frame, FwSizeType size) {
     }
     U16 expected = 0;
     if (cmd == CMD_DOWNLOAD) {
-        // line echo then pixels; the pixel count is not checked (the SDD specifies no such check)
-        if (length < 2) {
+        // line echo then exactly one line of pixels; anything else is not stored and the line
+        // is re-requested when the reply times out
+        if (length != static_cast<U16>(LINE_ECHO_SIZE + this->m_pixelsPerLine)) {
             this->discard(DiscardCause::MALFORMED, frame, headSize, bytes);
             return;
         }

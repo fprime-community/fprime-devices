@@ -206,6 +206,8 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
 
     //! Status returned to productGetOut
     Fw::Success::T m_productGetStatus;
+    //! Bytes withheld from each product buffer handed out (0: the requested size)
+    FwSizeType m_productGetShrink;
 
     //! Backing store for receive buffers handed to the component
     U8 m_rxStore[MAX_REPLY * 2];

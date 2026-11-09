@@ -44,7 +44,8 @@ SunCamMgrTester::SunCamMgrTester()
       m_frameCount(0),
       m_setupStateAtClear(SetupState::NOT_SETUP),
       m_sendStatus(Drv::ByteStreamStatus::OP_OK),
-      m_productGetStatus(Fw::Success::SUCCESS) {
+      m_productGetStatus(Fw::Success::SUCCESS),
+      m_productGetShrink(0) {
     ::memset(this->m_lastFrame, 0, sizeof this->m_lastFrame);
     ::memset(this->m_rxStore, 0, sizeof this->m_rxStore);
     ::memset(this->m_dpStore, 0, sizeof this->m_dpStore);
@@ -81,7 +82,7 @@ Fw::Success::T SunCamMgrTester::productGet_handler(FwDpIdType id, FwSizeType dat
     if (dataSize > sizeof this->m_dpStore) {
         return Fw::Success::FAILURE;
     }
-    buffer = Fw::Buffer(this->m_dpStore, dataSize);
+    buffer = Fw::Buffer(this->m_dpStore, dataSize - this->m_productGetShrink);
     return Fw::Success::SUCCESS;
 }
 
@@ -878,6 +879,14 @@ void SunCamMgrTester::testDownloadLineRetryAndFail() {
     this->lineReply(0, PREVIEW_PIXELS, 0);
     this->lineReply(1, PREVIEW_PIXELS, 1);
     this->assertFrame(CMD_DOWNLOAD, 1, 1, 0, 2, 9);
+    // a line reply with the wrong pixel count is discarded, not stored, and the line is re-requested on timeout
+    this->lineReply(2, PREVIEW_PIXELS - 1, 2);
+    this->lineReply(2, PREVIEW_PIXELS + 1, 2);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(2);
+    ASSERT_EQ(this->eventHistory_FrameDiscarded->at(0).cause, DiscardCause::MALFORMED);
+    ASSERT_EQ(this->eventHistory_FrameDiscarded->at(1).cause, DiscardCause::MALFORMED);
+    ASSERT_EVENTS_LineRetry_SIZE(0);
+    this->assertFrame(CMD_DOWNLOAD, 1, 1, 0, 2, 9);
     for (U8 attempt = 1; attempt <= KissCamConfig::LINE_RETRIES; attempt++) {
         this->tick(KissCamConfig::REPLY_TIMEOUT_TICKS);
         ASSERT_EVENTS_ReplyTimeout_SIZE(attempt);
@@ -965,19 +974,18 @@ void SunCamMgrTester::testDownloadFailedSendAndProductFull() {
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 2, Fw::CmdResponse::EXECUTION_ERROR);
     this->clearHistory();
 
-    // Container full: lines longer than requested (parsed by length) exhaust the preview-sized container
+    // Container full: a product one byte short of the requested size cannot take the last line
+    this->m_productGetShrink = 1;
     this->startDownload(Slot::SLOT_1, Resolution::PREVIEW, 3);
-    const FwSizeType lineCapacity =
-        imageDataSize(PREVIEW_LINES, PREVIEW_PIXELS) - SunCamMgr::SIZE_OF_ImageHeader_RECORD;
-    const U16 oversizeLinesThatFit =
-        static_cast<U16>(lineCapacity / SunCamMgr::SIZE_OF_ImageLine_RECORD(FULL_PIXELS + 3));
-    for (U16 line = 0; line <= oversizeLinesThatFit; line++) {
+    const U16 linesThatFit = PREVIEW_LINES - 1;
+    for (U16 line = 0; line <= linesThatFit; line++) {
         ASSERT_EVENTS_DownloadFailed_SIZE(0);
-        this->lineReply(line, FULL_PIXELS, static_cast<U8>(line));
+        this->lineReply(line, PREVIEW_PIXELS, static_cast<U8>(line));
     }
+    this->m_productGetShrink = 0;
     ASSERT_EVENTS_DownloadFailed_SIZE(1);
-    ASSERT_EVENTS_DownloadFailed(0, Slot::SLOT_1, oversizeLinesThatFit, DownloadFailCause::PRODUCT_FULL);
-    ASSERT_EQ(this->checkProduct(header, FULL_PIXELS, oversizeLinesThatFit, 1), oversizeLinesThatFit);
+    ASSERT_EVENTS_DownloadFailed(0, Slot::SLOT_1, linesThatFit, DownloadFailCause::PRODUCT_FULL);
+    ASSERT_EQ(this->checkProduct(header, PREVIEW_PIXELS, linesThatFit, 1), linesThatFit);
     ASSERT_CMD_RESPONSE(0, SunCamMgr::OPCODE_DOWNLOAD, 3, Fw::CmdResponse::EXECUTION_ERROR);
 }
 

@@ -137,7 +137,7 @@ module KissCam {
         resolution: Resolution
         width: U16 @< Image width in pixels: 640 / 80 (SD), 1280 / 160 (HD)
         height: U16 @< Image height in lines: 480 / 60 (SD), 960 / 120 (HD)
-        cameraMode: Mode @< Camera mode at download time (mode byte of the Download replies)
+        cameraMode: Mode @< Camera mode at download time (mode byte of the Memory Status reply that started the download)
         linesExpected: U16 @< ImageLine records in a complete product: 480 / 60 (SD), 1920 / 240 (HD, slots 1-4 in order)
     }
 }
