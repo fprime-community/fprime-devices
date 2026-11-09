@@ -8,5 +8,7 @@ module KissCam {
         constant LINE_RETRIES = 3
         @ Default priority of the Image data-product container
         constant IMAGE_DP_PRIORITY = 10
+        @ run ticks between periodic re-writes of the component-owned channels (1 s at 10 Hz)
+        constant TLM_PERIOD_TICKS = 10
     }
 }

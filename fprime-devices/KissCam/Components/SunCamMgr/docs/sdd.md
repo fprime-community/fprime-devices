@@ -53,7 +53,7 @@ Table 1 — Parameters (persisted camera settings, pushed at set-up and on chang
 | Parameter | Type / range | Default | Camera command |
 |---|---|---|---|
 | CAMERA_MODE | enum SD, HD | SD | Set Mode (`M`) |
-| EXPOSURE | U16, 2..960 steps of 89.5 µs (not range-checked by the component: the camera's error reply is the single validator, §7.4.4) | 672 | Set Exposure (`E`) |
+| EXPOSURE | U16, 2..960 steps of 89.5 µs (not range-checked by the component: the camera's error reply is the single validator, §7.4.4; an out-of-range persisted value fails every SETUP_CAMERA at SET_EXPOSURE until PRM_SET corrects it) | 672 | Set Exposure (`E`) |
 
 Table 2 — Commands (ground operations)
 
@@ -91,6 +91,7 @@ Table 4 — Constants and data-product records
 |---|---|---|
 | REPLY_TIMEOUT_TICKS | 20 (configurable) | `run` ticks allowed per camera reply (datasheet: 2000 ms) |
 | LINE_RETRIES | 3 (configurable) | re-requests of one image line before the download aborts |
+| TLM_PERIOD_TICKS | 10 (configurable) | `run` ticks between periodic re-writes of the component-owned channels (1 s at 10 Hz) |
 | ImageHeader record | slot, resolution, width, height, cameraMode, linesExpected | first record of every image product; `cameraMode` = mode byte of the Download replies (camera mode at download time); the image's capture mode is the slot's Memory Status mode — an HD image is four slot products |
 | ImageLine record | U8 array: line number (2 bytes, MSB first) then 640 or 80 pixels | one record per line received, camera byte order |
 
@@ -156,6 +157,7 @@ rate re-sets the constant to keep ≈ 2 s. The deployment opens the UART at 1152
 constant REPLY_TIMEOUT_TICKS = 20   # run ticks per reply (2 s at 10 Hz)
 constant LINE_RETRIES = 3           # re-requests of one line before the download aborts
 constant IMAGE_DP_PRIORITY = 10     # default priority of the Image container
+constant TLM_PERIOD_TICKS = 10      # run ticks between periodic channel re-writes (1 s at 10 Hz)
 instance sunCamMgr: KissCam.SunCamMgr base id 0x... queue size 64 stack size 65536 priority 100
 ```
 Image container size per DOWNLOAD: `Header::SIZE + 2·hash + SIZE_OF_ImageHeader_RECORD + lines × SIZE_OF_ImageLine_RECORD
@@ -175,7 +177,7 @@ response is deferred to the operation's end (DOWNLOAD FULL ≈ 30 s nominal, PRE
 (LINE_RETRIES + 1) × 2 s; sequence timeouts are set in the topology SDD); SLEEP ends in NOT_SETUP either way and its reply
 is exempt from the mode check. Receive buffers with status OP_OK are appended to a component-local 648-byte assembler
 (rather than `Svc.FrameAccumulator`, whose `ComDataWithContext` ports would need an adapter and a second topology
-component), others are returned and counted as discarded, and a reply is complete when the length field (excluding the
+component), others are counted as discarded and returned when they carry data (a null notice has nothing to return), and a reply is complete when the length field (excluding the
 final 0x0D; image payloads may contain 0x0D) is satisfied. A complete reply is matched to the outstanding command byte and
 to every parameter it echoes (Download line number, Read Register address) — a mismatch, or a reply after its exchange
 timed out, is discarded (WRONG_COMMAND / NO_OPERATION; replies carry no sequence number, so a late reply to a re-sent
@@ -185,8 +187,7 @@ requirements (set-up/push → NOT_SETUP; download line → `LineRetry`, then abo
 first, adds one `ImageLine` record per reply and sends the product on completion or abort. `parameterUpdated` only sets a
 guarded dirty flag; the `run` handler pushes while idle (`CAMERA_MODE`, then `EXPOSURE` + readback), and on its first tick
 the component reports SetupState NOT_SETUP, CurrentOperation NONE and zero counters and re-writes SetupState, CurrentOperation and the nine U32
-counters every 10th tick (1 Hz) as well as on change (camera-sourced channels are written on reply only). Implementation obligations, verified by unit test: readback compared with the exposure value sent; both
-parameters read once per push; assembler never indexes past 648 bytes and resyncs on 0x40; per-exchange count-down.
+counters every `TLM_PERIOD_TICKS` ticks (1 Hz at the 10 Hz rate) as well as on change (camera-sourced channels are written on reply only). Replies are parsed by length within the 648-byte assembler; the exposure readback is compared with the value sent.
 
 ```mermaid
 sequenceDiagram
