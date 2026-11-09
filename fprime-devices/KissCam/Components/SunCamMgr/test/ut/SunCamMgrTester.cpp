@@ -811,6 +811,14 @@ void SunCamMgrTester::testDownloadFullAndPreview() {
     this->assertSetupState(SetupState::READY);
     this->clearHistory();
     this->m_frameCount = 0;
+    // the header carries the Exposure channel value, here changed to 10 before the download
+    this->setExposure(10);
+    this->tick();
+    this->ack(CMD_SET_EXPOSURE, MODE_ZOOM);
+    this->registerReply(EXPOSURE_REGISTER, 10, MODE_ZOOM);
+    ASSERT_TLM_Exposure(0, 10);
+    this->clearHistory();
+    this->m_frameCount = 0;
     this->startDownload(Slot::SLOT_3, Resolution::PREVIEW, 2);
     ASSERT_PRODUCT_GET(0, 0, Fw::DpContainer::getPacketSizeForDataSize(imageDataSize(PREVIEW_LINES, PREVIEW_PIXELS)));
     for (U16 line = 0; line < PREVIEW_LINES; line++) {
@@ -818,8 +826,7 @@ void SunCamMgrTester::testDownloadFullAndPreview() {
         this->lineReply(line, PREVIEW_PIXELS, static_cast<U8>(line), MODE_ZOOM);
     }
     ASSERT_EVENTS_DownloadStarted(0, Slot::SLOT_3, Mode::ZOOM, Resolution::PREVIEW, PREVIEW_LINES);
-    const ImageHeader previewHeader(Slot::SLOT_3, Mode::ZOOM, Resolution::PREVIEW, 64, 48, DEFAULT_EXPOSURE,
-                                    PREVIEW_LINES);
+    const ImageHeader previewHeader(Slot::SLOT_3, Mode::ZOOM, Resolution::PREVIEW, 64, 48, 10, PREVIEW_LINES);
     ASSERT_EQ(this->checkProduct(previewHeader, PREVIEW_PIXELS, PREVIEW_LINES, 3), PREVIEW_LINES);
     ASSERT_EVENTS_DownloadComplete_SIZE(1);
     ASSERT_EVENTS_DownloadComplete(0, Slot::SLOT_3, Mode::ZOOM, Resolution::PREVIEW, PREVIEW_LINES,
@@ -962,6 +969,24 @@ void SunCamMgrTester::testPowerOnBanner() {
     ASSERT_EVENTS_FrameDiscarded_SIZE(2);
     ASSERT_EVENTS_FrameDiscarded(1, DiscardCause::MALFORMED, 21, bannerHead);
     ASSERT_TLM_DiscardedBytes(1, 42);
+    // noise before the line, line split across buffers: the noise is its own discard
+    U8 mixed[12] = {0xAA, 0x55};
+    ::memcpy(&mixed[2], SunCamMgr::POWER_ON_LINE, 10);
+    this->receive(mixed, sizeof mixed, Drv::ByteStreamStatus::OP_OK);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(3);
+    ASSERT_EVENTS_FrameDiscarded(2, DiscardCause::MALFORMED, 2, head(0xAA, 0x55, 0, 0, 0, 0, 0, 0));
+    this->receive(&SunCamMgr::POWER_ON_LINE[10], 11, Drv::ByteStreamStatus::OP_OK);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(4);
+    ASSERT_EVENTS_FrameDiscarded(3, DiscardCause::MALFORMED, 21, bannerHead);
+    ASSERT_TLM_DiscardedBytes(3, 65);
+    // a malformed frame (oversize length) immediately followed by the line in one buffer
+    U8 bad[5 + 21] = {START, CMD_PING, MODE_SD, 0xFF, 0xFF};
+    ::memcpy(&bad[5], SunCamMgr::POWER_ON_LINE, 21);
+    this->receive(bad, sizeof bad, Drv::ByteStreamStatus::OP_OK);
+    ASSERT_EVENTS_FrameDiscarded_SIZE(6);
+    ASSERT_EVENTS_FrameDiscarded(4, DiscardCause::MALFORMED, 5, head(START, CMD_PING, MODE_SD, 0xFF, 0xFF, 0, 0, 0));
+    ASSERT_EVENTS_FrameDiscarded(5, DiscardCause::MALFORMED, 21, bannerHead);
+    ASSERT_TLM_DiscardedBytes(5, 91);
     ASSERT_EVENTS_CameraRestarted_SIZE(0);
     ASSERT_EQ(this->m_frameCount, 0u);
     // READY, idle

@@ -164,7 +164,8 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     //! Send one 7-byte command frame and arm the reply timeout; false when the driver refused it
     bool sendFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4);
 
-    //! Reply timeout, 0xFF reply, mode or exposure-readback mismatch, or send failure of the exchange in progress
+    //! Reply timeout, 0xFF reply, mode or exposure-readback mismatch, send failure, or the camera power-on line of the
+    //! exchange in progress
     void exchangeFailed(FailCause::T cause);
 
     //! Append received bytes to the assembler and process every complete reply
@@ -172,6 +173,9 @@ class SunCamMgr final : public SunCamMgrComponentBase {
 
     //! Flush the bytes skipped while resynchronising as one discard
     void flushStray();
+
+    //! Account one byte of a stray run: head, count and the power-on line matcher (REQ-034)
+    void strayByte(U8 byte);
 
     //! Account for a discarded frame
     void discard(DiscardCause::T cause, const U8* bytes, FwSizeType headSize, U32 totalBytes);
@@ -199,6 +203,8 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     bool takeExposureParameter();
 
     //! Reject CAPTURE/DOWNLOAD with a slot other than SLOT_0 while the camera is in HD (REQ-035)
+    //! HD images are named by SLOT_0 only (REQ-035): call right after a successful acceptCommand; on refusal it
+    //! answers CommandRejected(HD_SLOT) + EXECUTION_ERROR and undoes the admission, returning false
     bool slotAllowed(Operation::T operation, Slot::T slot);
     //! Write the ImageHeader record from the first line reply (reported = its mode byte) and announce the download
     void writeImageHeader(Mode::T reported);
@@ -239,6 +245,8 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     // Set-up and parameter push
     SetupStep::T m_setupStep;
     U16 m_exposureSent;
+    U16 m_exposure;  //!< Exposure channel value: the last exposure the camera acknowledged (m_exposureSent: being
+                     //!< pushed)
     //! CAMERA_MODE value pushed by the set-up in progress (reported by SetupComplete)
     CaptureMode::T m_modeSent;
     PingType::T m_pingType;
@@ -271,7 +279,6 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     U32 m_strayCount;
     U8 m_strayHead[FRAME_HEAD_SIZE];
     FwSizeType m_powerOnMatch;  //!< bytes of POWER_ON_LINE matched by the tail of the stray run
-    U16 m_exposure;             //!< the Exposure channel value: the last exposure the camera acknowledged
 
     // Tick
     std::atomic<bool> m_runQueued;

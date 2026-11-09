@@ -78,6 +78,7 @@ SunCamMgr::SunCamMgr(const char* const compName)
       m_ticksWaiting(0),
       m_setupStep(SetupStep::PING_MCU),
       m_exposureSent(0),
+      m_exposure(0),
       m_modeSent(CaptureMode::SD),
       m_pingType(PingType::MCU),
       m_captureSlot(Slot::SLOT_0),
@@ -98,7 +99,6 @@ SunCamMgr::SunCamMgr(const char* const compName)
       m_rxLen(0),
       m_strayCount(0),
       m_powerOnMatch(0),
-      m_exposure(0),
       m_runQueued(false),
       m_tickCount(0),
       m_modeDirty(false),
@@ -562,19 +562,7 @@ void SunCamMgr::assemble(const U8* bytes, FwSizeType size) {
         if (this->m_rxLen == 0) {
             if (byte != FRAME_START) {
                 // resynchronising: skipped bytes are reported as one discard
-                if (this->m_strayCount < FRAME_HEAD_SIZE) {
-                    this->m_strayHead[this->m_strayCount] = byte;
-                }
-                this->m_strayCount++;
-                // the camera's power-on line is unframed: recognise it in the stray run (REQ-034)
-                if (byte == POWER_ON_LINE[this->m_powerOnMatch]) {
-                    this->m_powerOnMatch++;
-                } else {
-                    this->m_powerOnMatch = (byte == POWER_ON_LINE[0]) ? 1 : 0;
-                }
-                if (this->m_powerOnMatch == POWER_ON_LINE_SIZE) {
-                    this->powerOnLineReceived();
-                }
+                this->strayByte(byte);
                 continue;
             }
             this->flushStray();
@@ -600,18 +588,41 @@ void SunCamMgr::assemble(const U8* bytes, FwSizeType size) {
             }
         }
         if (malformed) {
-            // the bytes of the bad frame start a resynchronisation run
-            ::memcpy(this->m_strayHead, this->m_rx, FW_MIN(this->m_rxLen, FRAME_HEAD_SIZE));
-            this->m_strayCount = static_cast<U32>(this->m_rxLen);
-            this->m_powerOnMatch = 0;
+            // the bytes of the bad frame start a resynchronisation run (they may hold the power-on line)
+            const FwSizeType badLen = this->m_rxLen;
             this->m_rxLen = 0;
+            for (FwSizeType k = 0; k < badLen; k++) {
+                this->strayByte(this->m_rx[k]);
+            }
         }
     }
-    // a stray run that is so far exactly a prefix of the power-on line may continue in the next buffer
-    const bool powerOnPrefix =
-        (this->m_powerOnMatch > 0) && (this->m_powerOnMatch == static_cast<FwSizeType>(this->m_strayCount));
-    if (!powerOnPrefix) {
+    // a stray run ending in a prefix of the power-on line may continue in the next buffer: keep that tail
+    if (this->m_powerOnMatch > 0) {
+        const FwSizeType before = static_cast<FwSizeType>(this->m_strayCount) - this->m_powerOnMatch;
+        if (before > 0) {
+            this->discard(DiscardCause::MALFORMED, this->m_strayHead, FW_MIN(before, FRAME_HEAD_SIZE),
+                          static_cast<U32>(before));
+            ::memcpy(this->m_strayHead, POWER_ON_LINE, FW_MIN(this->m_powerOnMatch, FRAME_HEAD_SIZE));
+            this->m_strayCount = static_cast<U32>(this->m_powerOnMatch);
+        }
+    } else {
         this->flushStray();
+    }
+}
+
+void SunCamMgr::strayByte(U8 byte) {
+    if (this->m_strayCount < FRAME_HEAD_SIZE) {
+        this->m_strayHead[this->m_strayCount] = byte;
+    }
+    this->m_strayCount++;
+    // the camera's power-on line is unframed: recognise it anywhere in the stray run (REQ-034)
+    if (byte == POWER_ON_LINE[this->m_powerOnMatch]) {
+        this->m_powerOnMatch++;
+    } else {
+        this->m_powerOnMatch = (byte == POWER_ON_LINE[0]) ? 1 : 0;
+    }
+    if (this->m_powerOnMatch == POWER_ON_LINE_SIZE) {
+        this->powerOnLineReceived();
     }
 }
 
@@ -625,8 +636,17 @@ void SunCamMgr::flushStray() {
 }
 
 void SunCamMgr::powerOnLineReceived() {
-    // the run holding the line is one discard (REQ-020); nothing else while the camera was not set up
-    this->flushStray();
+    // stray bytes before the line are their own discard; the line is one discard of 21 bytes (REQ-020)
+    FW_ASSERT(this->m_strayCount >= POWER_ON_LINE_SIZE, static_cast<FwAssertArgType>(this->m_strayCount));
+    const U32 before = this->m_strayCount - static_cast<U32>(POWER_ON_LINE_SIZE);
+    if (before > 0) {
+        this->discard(DiscardCause::MALFORMED, this->m_strayHead,
+                      FW_MIN(static_cast<FwSizeType>(before), FRAME_HEAD_SIZE), before);
+    }
+    this->m_strayCount = 0;
+    this->m_powerOnMatch = 0;
+    this->discard(DiscardCause::MALFORMED, POWER_ON_LINE, FRAME_HEAD_SIZE, static_cast<U32>(POWER_ON_LINE_SIZE));
+    // nothing else while the camera was not set up
     if (this->m_setupState == SetupState::NOT_SETUP) {
         return;
     }

@@ -178,7 +178,7 @@ class SunCamMgrTester final : public SunCamMgrGTestBase {
     //! Parse the last sent product: header record then line records; returns the number of line records
     U32 checkProduct(const KissCam::ImageHeader& expectedHeader, U16 pixels, U32 expectedLines, U8 firstSlot);
 
-    //! Run a download through Memory Status (all SD) up to the first line request
+    //! Send DOWNLOAD and dispatch it; asserts the first line request (slot, resolution, line 0) left
     void startDownload(Slot slot, Resolution resolution, U32 cmdSeq = 0);
 
   private:
