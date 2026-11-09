@@ -156,12 +156,18 @@ module KissCam {
         event CaptureComplete(slot: Slot, testPattern: TestPattern, exposure: U16, mode: Mode) severity activity high \
             format "Captured slot {} (test pattern {}) at exposure {} in mode {}"
 
-        @ Product allocated and the first Download request sent; imageMode = the mode byte of the first line reply
+        @ First line reply received: imageMode = its mode byte, ImageHeader record written (product allocated at the command)
         event DownloadStarted(slot: Slot, imageMode: Mode, resolution: Resolution, lines: U16) severity activity low \
             format "Download of slot {} ({} image) at {} started: {} lines"
 
         @ Every line received; product sent
-        event DownloadComplete(slot: Slot, imageMode: Mode, resolution: Resolution, lines: U16, bytes: U32) severity activity high \
+        event DownloadComplete(
+            slot: Slot,
+            imageMode: Mode,
+            resolution: Resolution,
+            lines: U16,
+            bytes: U32 @< Image bytes received: lines x 640 (FULL) or x 64 (PREVIEW); not the serialized record bytes
+        ) severity activity high \
             format "Download of slot {} ({} image) at {} complete: {} lines, {} bytes"
 
         @ DOWNLOAD_ABORT ended the download; lines received so far were delivered

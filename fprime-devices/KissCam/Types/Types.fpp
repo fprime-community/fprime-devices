@@ -131,11 +131,10 @@ module KissCam {
     @ First record of every Image data product (SDD Table 4)
     struct ImageHeader {
         slot: Slot @< Slot commanded (every image is the one slot downloaded)
-        imageMode: Mode @< Mode byte of the first Download reply (the camera's mode when the download started)
+        imageMode: Mode @< Mode byte of the first Download reply (a later reply whose mode byte differs is a ModeMismatch, REQ-021)
         resolution: Resolution
         width: U16 @< Image width in pixels: 640 (FULL) / 64 (PREVIEW)
         height: U16 @< Image height in lines: 480 (FULL) / 48 (PREVIEW)
-        cameraMode: Mode @< Same as imageMode (kept for record compatibility; a later line whose mode byte differs is a ModeMismatch, REQ-021)
         exposure: U16 @< The component's last pushed or read-back exposure at download time (the camera reports none)
         linesExpected: U16 @< ImageLine records in a complete product: 480 (FULL) / 48 (PREVIEW)
     }
