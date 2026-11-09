@@ -8,10 +8,11 @@ module KissCam {
         # UART driver (Drv.ByteStreamDriver client, receive made asynchronous)
         # ----------------------------------------------------------------------
 
-        @ Driver (re)connected; recorded only — no probe is sent (the camera may be off)
-        sync input port drvConnected: Drv.ByteStreamReady
+        @ Driver (re)connected: handler is empty, no state is kept, no probe is sent (the camera may be off)
+        async input port drvConnected: Drv.ByteStreamReady drop
 
-        @ Bytes from the camera; one reply may arrive in several buffers. Queue full: buffer returned, counted
+        @ Bytes from the camera, framed on the component thread (one reply arrives in several buffers).
+        @ Queue-full hook, in the driver's thread: returns the buffer and counts the drop — nothing else
         async input port drvReceiveIn: Drv.ByteStreamData hook
 
         @ Returns the driver's receive buffers
@@ -24,10 +25,11 @@ module KissCam {
         # Framework services
         # ----------------------------------------------------------------------
 
-        @ Rate-group tick: reply timeouts are counted in these ticks (KissCamConfig.REPLY_TIMEOUT_TICKS)
+        @ Rate-group tick (10 Hz): reply timeouts are counted in these ticks (KissCamConfig.REPLY_TIMEOUT_TICKS).
+        @ Queue-full hook only counts the drop
         async input port run: Svc.Sched hook
 
-        @ Health ping
+        @ Health ping; queue-full hook only counts the drop
         async input port pingIn: Svc.Ping hook
 
         @ Health ping reply
@@ -73,7 +75,8 @@ module KissCam {
         param EXPOSURE: U16 default 672
 
         # ----------------------------------------------------------------------
-        # Commands (SDD Table 2)
+        # Commands (SDD Table 2). Queue-full hooks run in the dispatcher's thread and only answer
+        # the command BUSY and count the drop; the component thread reports QueueOverflow on its next tick.
         # ----------------------------------------------------------------------
 
         @ Ping MCU, Set Mode (CAMERA_MODE), Set Exposure (EXPOSURE), Read Register 0x3012, Ping MCU+sensor; then READY
@@ -88,13 +91,13 @@ module KissCam {
         @ Memory Status: mode, exposure and uptime of the image in each of the four slots (needs READY)
         async command MEMORY_STATUS hook
 
-        @ Capture an image into a slot (ignored by the camera in HD), optionally the test pattern (needs READY)
-        async command CAPTURE(slot: U8 @< Memory slot 1..4
-                              testPattern: TestPattern) hook
+        @ Capture an image into a slot, optionally the test pattern (needs READY). In HD mode the camera
+        @ ignores the slot and the image occupies slots 1-4; CaptureComplete echoes the argument and the mode
+        async command CAPTURE(slot: Slot, testPattern: TestPattern) hook
 
-        @ Download every line of a slot into one Image data product (needs READY)
-        async command DOWNLOAD(slot: U8 @< Memory slot 1..4
-                               resolution: Resolution) hook
+        @ Download every line of a slot into one Image data product (needs READY). An HD image is four
+        @ slot downloads reassembled on the ground; MEMORY_STATUS tells which slots hold HD quadrants
+        async command DOWNLOAD(slot: Slot, resolution: Resolution) hook
 
         @ Stop the download in progress after the pending line; the lines received are still delivered
         async command DOWNLOAD_ABORT hook
@@ -140,19 +143,19 @@ module KissCam {
         event MemoryStatusReply(slots: MemorySlots) severity activity low format "Camera memory slots: {}"
 
         @ Capture acknowledged
-        event CaptureComplete(slot: U8, testPattern: TestPattern, exposure: U16) severity activity high \
-            format "Captured slot {} (test pattern {}) at exposure {}"
+        event CaptureComplete(slot: Slot, testPattern: TestPattern, exposure: U16, mode: Mode) severity activity high \
+            format "Captured slot {} (test pattern {}) at exposure {} in mode {}"
 
         @ DOWNLOAD accepted
-        event DownloadStarted(slot: U8, resolution: Resolution, lines: U16) severity activity low \
+        event DownloadStarted(slot: Slot, resolution: Resolution, lines: U16) severity activity low \
             format "Download of slot {} at {} started: {} lines"
 
         @ Every line received; product sent
-        event DownloadComplete(slot: U8, resolution: Resolution, lines: U16, bytes: U32) severity activity high \
+        event DownloadComplete(slot: Slot, resolution: Resolution, lines: U16, bytes: U32) severity activity high \
             format "Download of slot {} at {} complete: {} lines, {} bytes"
 
         @ Download ended early; lines received so far were delivered when a product existed
-        event DownloadAborted(slot: U8, linesReceived: U16, cause: AbortCause) severity warning low \
+        event DownloadAborted(slot: Slot, linesReceived: U16, cause: AbortCause) severity warning low \
             format "Download of slot {} aborted after {} lines: {}"
 
         @ An image line is being re-requested
@@ -162,7 +165,7 @@ module KissCam {
         event RegisterRead(address: U16, value: U16) severity activity high \
             format "Register 0x{x} = 0x{x}"
 
-        @ A ground command was rejected
+        @ A ground command was rejected (response EXECUTION_ERROR, or BUSY for cause BUSY)
         event CommandRejected(operation: Operation, cause: RejectCause) severity warning low \
             format "{} rejected: {}"
 
@@ -174,9 +177,9 @@ module KissCam {
         event ReplyTimeout(operation: Operation, cmdByte: U8) severity warning high \
             format "Camera reply timeout during {} (command 0x{x})"
 
-        @ Received bytes discarded
-        event FrameDiscarded(cause: DiscardCause, bytes: U32) severity warning low \
-            format "Discarded {} bytes: {}"
+        @ Received bytes discarded; throttled, SETUP_CAMERA clears the throttle
+        event FrameDiscarded(cause: DiscardCause, bytes: U32, head: FrameHead) severity warning low \
+            format "Discarded {} bytes: {} head {}" throttle 10
 
         @ The camera reported a mode other than the commanded one while READY
         event ModeMismatch(commanded: Mode, reported: Mode) severity warning high \
@@ -190,31 +193,53 @@ module KissCam {
         event ProductAllocationFailed(bytes: U32) severity warning high \
             format "Image data product allocation of {} bytes failed"
 
-        @ The message queue was full; the newest input was dropped
-        event QueueOverflow(source: QueueInput) severity warning high format "Queue full: {} dropped"
+        @ Queue-full drops since the last tick, reported from the component thread; SETUP_CAMERA clears the throttle
+        event QueueOverflow(source: QueueInput, dropped: U32) severity warning high \
+            format "Queue full: {} dropped {} times" throttle 10
 
         # ----------------------------------------------------------------------
         # Telemetry (SDD Table 3)
         # ----------------------------------------------------------------------
 
+        @ Component set-up state
         telemetry SetupState: SetupState
+        @ Operation in progress; NONE when idle
+        telemetry CurrentOperation: Operation
+        @ Camera mode from the mode byte of the last reply
         telemetry CameraMode: Mode
+        @ EXPOSURE value the camera acknowledged, or the exposure of the last Capture reply (steps of 89.5 us)
         telemetry Exposure: U16
+        @ Sensor register 0x3012 from the last readback (steps of 89.5 us)
         telemetry ExposureReadback: U16
-        telemetry CameraUptime: U16
+        @ Camera uptime from the last Ping reply (s, rolls over at 65536)
+        telemetry CameraUptime: U16 format "{} s"
+        @ Valid commands counted by the camera since its boot (last Ping reply; rolls over at 256)
         telemetry CameraValidCmds: U8
+        @ Invalid commands counted by the camera since its boot (last Ping or error reply; rolls over at 256)
         telemetry CameraInvalidCmds: U8
+        @ Memory Status reply: mode, exposure and uptime of the image in each slot
         telemetry MemorySlots: MemorySlots
+        @ Last Read Register reply
         telemetry RegisterValue: RegisterValue
+        @ Last camera error reply
         telemetry LastCameraError: CameraErrorInfo
+        @ Command/reply exchanges completed with an acknowledgement (since boot)
         telemetry Exchanges: U32
+        @ Error replies received (since boot)
         telemetry CameraErrors: U32
+        @ Reply timeouts (since boot)
         telemetry Timeouts: U32
+        @ Bytes discarded outside an operation, malformed or for another command (since boot)
         telemetry DiscardedBytes: U32
+        @ Discarded frames (since boot)
         telemetry MalformedReplies: U32
+        @ Capture acknowledgements (since boot)
         telemetry ImagesCaptured: U32
+        @ Image lines stored in products (since boot)
         telemetry LinesDownloaded: U32
+        @ Image data products sent (since boot)
         telemetry ProductsSent: U32
+        @ Inputs dropped by queue-full hooks (since boot; mutex-guarded count read on the run tick)
         telemetry QueueOverflows: U32
     }
 }

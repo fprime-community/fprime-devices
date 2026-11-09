@@ -25,6 +25,13 @@ module KissCam {
         FULL = 0 @< 640 x 480, 480 lines of 640 pixels
         PREVIEW = 1 @< 80 x 60, 60 lines of 80 pixels
     }
+    @ Camera memory slot (datasheet §7.4.5)
+    enum Slot : U8 {
+        SLOT_1 = 1
+        SLOT_2 = 2
+        SLOT_3 = 3
+        SLOT_4 = 4
+    }
     @ Component set-up state (SDD Table 3)
     enum SetupState : U8 {
         NOT_SETUP = 0 @< Settings not applied; only SETUP_CAMERA, SLEEP, PING accepted
@@ -52,7 +59,6 @@ module KissCam {
         NOT_READY = 0 @< Command needs READY (SDD Table 2)
         BUSY = 1 @< An operation is in progress
         NO_DOWNLOAD = 2 @< DOWNLOAD_ABORT with no download in progress
-        INVALID_ARGUMENT = 3 @< Slot outside 1..4
     }
     @ Why received bytes were discarded
     enum DiscardCause : U8 {
@@ -91,6 +97,7 @@ module KissCam {
         DOWNLOAD_ABORT = 6
         READ_REGISTER = 7
         PARAMETER_PUSH = 8
+        NONE = 9 @< No operation in progress (CurrentOperation channel only)
     }
     @ Queue inputs that can overflow (SDD REQ-029)
     enum QueueInput : U8 {
@@ -99,6 +106,9 @@ module KissCam {
         RUN_TICK = 2
         HEALTH_PING = 3
     }
+    @ First bytes of a discarded frame, zero-padded (FrameDiscarded event)
+    array FrameHead = [8] U8
+
     @ One memory slot of the Memory Status reply (datasheet §7.4.3)
     struct MemorySlot {
         mode: Mode @< Camera mode when the image was taken
@@ -120,11 +130,11 @@ module KissCam {
     }
     @ First record of every Image data product (SDD Table 4)
     struct ImageHeader {
-        slot: U8 @< Memory slot 1..4
+        slot: Slot
         resolution: Resolution
         width: U16 @< Pixels per line: 640 or 80
         height: U16 @< Lines in a complete image: 480 or 60
-        mode: Mode @< Camera mode reported in the first line reply
+        cameraMode: Mode @< Camera mode at download time; whether the slot is an SD image or an HD quadrant comes from MemorySlots (Memory Status IMD)
         linesExpected: U16 @< Lines requested; the record count tells how many were received
     }
 }

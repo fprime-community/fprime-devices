@@ -2,7 +2,7 @@ register_fprime_module(
     AUTOCODER_INPUTS
         "${CMAKE_CURRENT_LIST_DIR}/SunCamMgr.fpp"
     DEPENDS
-        Drv_Ports
+        Drv_ByteStreamDriverModel
         Fw_Buffer
         Svc_Ping
         Svc_Sched
