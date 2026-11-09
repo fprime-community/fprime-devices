@@ -1,4 +1,11 @@
 module KissCam {
+    @ Download line requests per slot (SDD Table 4): 480 full, 48 preview; an HD image is 4 slots
+    constant FULL_LINES = 480
+    constant PREVIEW_LINES = 48
+    @ Pixel bytes per Download line reply (SDD Table 4)
+    constant FULL_PIXELS = 640
+    constant PREVIEW_PIXELS = 64
+
     @ Camera mode as the camera reports it in every reply (datasheet §6.2, §7.2)
     enum Mode : U8 {
         SLEEP = 0 @< Image sensor held in reset
@@ -56,6 +63,7 @@ module KissCam {
         MODE_MISMATCH = 3 @< Reply mode differs from the commanded mode
         EXPOSURE_MISMATCH = 4 @< Register 0x3012 readback differs from the pushed EXPOSURE
         OUT_OF_RANGE = 5 @< A persisted parameter is outside its Table 1 range; nothing was sent
+        CAMERA_RESTART = 6 @< The camera's power-on line arrived while the exchange was pending (REQ-034)
     }
     @ Why a ground command was rejected
     enum RejectCause : U8 {
@@ -75,6 +83,7 @@ module KissCam {
         LINE_FAILED = 0 @< A line failed LINE_RETRIES re-requests
         SEND_FAILED = 1 @< The UART driver refused a Download frame
         PRODUCT_FULL = 2 @< The data-product container could not hold the next record
+        CAMERA_RESTART = 3 @< The camera's power-on line arrived during the download (REQ-034)
     }
     @ Persisted camera settings (SDD Table 1)
     enum Setting : U8 {

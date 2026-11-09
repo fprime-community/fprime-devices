@@ -196,6 +196,10 @@ module KissCam {
         event FrameDiscarded(cause: DiscardCause, bytes: U32, head: FrameHead) severity warning low \
             format "Discarded {} bytes: {} head {}" throttle 10
 
+        @ The camera's 21-byte power-on line (SDD Table 4 POWER_ON_LINE) arrived while READY or SETTING_UP: the camera restarted
+        @ in Sleep; the operation in progress (NONE when idle) failed with CAMERA_RESTART and the component is NOT_SETUP
+        event CameraRestarted(operation: Operation) severity warning high \
+            format "Camera power-on line received during {}; component NOT_SETUP"
         @ The camera reported a mode other than the commanded one while READY
         event ModeMismatch(commanded: Mode, reported: Mode) severity warning high \
             format "Camera mode {} expected, {} reported; component NOT_SETUP"
