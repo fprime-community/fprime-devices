@@ -73,7 +73,7 @@ Table 3 — Telemetry
 | Channel | Type | Source |
 |---|---|---|
 | SetupState | enum NOT_SETUP, SETTING_UP, READY | component state |
-| CurrentOperation | enum Operation (NONE when idle) | component state |
+| CurrentOperation | enum NONE, SETUP_CAMERA, SLEEP, PING, MEMORY_STATUS, CAPTURE, DOWNLOAD, READ_REGISTER, PARAMETER_PUSH | component state (NONE when no operation is in progress) |
 | CameraMode | enum SLEEP, SD, HD | mode byte of every reply |
 | Exposure | U16 | EXPOSURE value whose Set Exposure was acknowledged; Capture reply exposure |
 | ExposureReadback | U16 | Read Register 0x3012 reply |
@@ -91,7 +91,7 @@ Table 4 — Constants and data-product records
 |---|---|---|
 | REPLY_TIMEOUT_TICKS | 20 (configurable) | `run` ticks allowed per camera reply (datasheet: 2000 ms) |
 | LINE_RETRIES | 3 (configurable) | re-requests of one image line before the download aborts |
-| ImageHeader record | slot, resolution, width, height, cameraMode, linesExpected | first record of every image product; an HD image is four slot products, identified by MemorySlots |
+| ImageHeader record | slot, resolution, width, height, cameraMode, linesExpected | first record of every image product; `cameraMode` = mode byte of the Download replies (camera mode at download time); the image's capture mode is the slot's Memory Status mode — an HD image is four slot products |
 | ImageLine record | U8 array: line number (2 bytes, MSB first) then 640 or 80 pixels | one record per line received, camera byte order |
 
 ## Design
