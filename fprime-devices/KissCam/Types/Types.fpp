@@ -2,13 +2,15 @@ module KissCam {
     @ Camera mode as the camera reports it in every reply (datasheet §6.2, §7.2)
     enum Mode : U8 {
         SLEEP = 0 @< Image sensor held in reset
-        SD = 1 @< Standard definition, 640 x 480 (preview 64 x 48), four slots
-        HD = 2 @< High definition: on this unit a single-slot 640 x 480 (preview 64 x 48) image tagged HD (SDD §Hardware notes)
+        SD = 1 @< Standard definition, 640 x 480 (preview 64 x 48), one of four slots
+        ZOOM = 2 @< Centre 640 x 480 of the sensor (preview 64 x 48), one of four slots
+        HD = 3 @< High definition, 1280 x 960 (preview 128 x 96) across slots 0..3 as quadrants
     }
     @ Capture modes the CAMERA_MODE parameter may select (Sleep is commanded with SLEEP)
     enum CaptureMode : U8 {
         SD = 1
-        HD = 2
+        ZOOM = 2
+        HD = 3
     }
     @ Ping type (datasheet §7.4.1)
     enum PingType : U8 {
@@ -25,12 +27,12 @@ module KissCam {
         FULL = 0 @< 640 x 480, 480 lines of 640 pixels
         PREVIEW = 1 @< 64 x 48, 48 lines of 64 pixels (SDD §Hardware notes)
     }
-    @ Camera memory slot (datasheet §7.4.5)
+    @ Camera memory slot, the Capture/Download slot byte (datasheet §7.4.5; HD: SLOT_0 names the four-slot image)
     enum Slot : U8 {
+        SLOT_0 = 0
         SLOT_1 = 1
         SLOT_2 = 2
         SLOT_3 = 3
-        SLOT_4 = 4
     }
     @ Component set-up state (SDD Table 3)
     enum SetupState : U8 {
@@ -60,6 +62,7 @@ module KissCam {
         NOT_READY = 0 @< Command needs READY (SDD Table 2)
         BUSY = 1 @< An operation is in progress
         NO_DOWNLOAD = 2 @< DOWNLOAD_ABORT with no download in progress
+        HD_SLOT = 3 @< CAPTURE or DOWNLOAD with a slot other than SLOT_0 while CAMERA_MODE is HD (REQ-035)
     }
     @ Why received bytes were discarded
     enum DiscardCause : U8 {
@@ -121,12 +124,12 @@ module KissCam {
     }
     @ First record of every Image data product (SDD Table 4)
     struct ImageHeader {
-        slot: Slot @< Slot commanded (every image is the one slot downloaded)
+        slot: Slot @< Slot commanded (SLOT_0 for an HD image, which spans slots 0..3)
         imageMode: Mode @< Mode byte of the first Download reply (a later reply whose mode byte differs is a ModeMismatch, REQ-021)
         resolution: Resolution
-        width: U16 @< Image width in pixels: 640 (FULL) / 64 (PREVIEW)
-        height: U16 @< Image height in lines: 480 (FULL) / 48 (PREVIEW)
+        width: U16 @< Image width in pixels: 640 (FULL) / 64 (PREVIEW); HD 1280 / 128
+        height: U16 @< Image height in lines: 480 (FULL) / 48 (PREVIEW); HD 960 / 96
         exposure: U16 @< The component's last pushed or read-back exposure at download time (the camera reports none)
-        linesExpected: U16 @< ImageLine records in a complete product: 480 (FULL) / 48 (PREVIEW)
+        linesExpected: U16 @< ImageLine records in a complete product: 480 (FULL) / 48 (PREVIEW); HD 1920 / 192
     }
 }

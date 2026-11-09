@@ -63,17 +63,18 @@ module KissCam {
         @ First record of an Image product
         product record ImageHeader: KissCam.ImageHeader id 0
 
-        @ One image line: slot (1 byte), line number (2 bytes, MSB first), then 640 (FULL) or 64 (PREVIEW) pixel bytes
+        @ One image line: slot (1 byte), line number (2 bytes, MSB first), then 640 (FULL) or 64 (PREVIEW) pixel bytes; in HD the
+        @ slot tag places the line in its quadrant (0 TL, 1 TR, 2 BL, 3 BR)
         product record ImageLine: U8 array id 1
 
-        @ One product per image: the one slot downloaded (SD or HD mode)
+        @ One product per image: the one slot downloaded (SD, Zoom) or slots 0..3 in order (HD)
         product container Image id 0 default priority KissCamConfig.IMAGE_DP_PRIORITY
 
         # ----------------------------------------------------------------------
         # Parameters (SDD Table 1) — pushed by SETUP_CAMERA and, while READY, on change
         # ----------------------------------------------------------------------
 
-        @ Capture mode pushed with Set Mode (SD or HD; both store one 640x480 slot on this unit, SDD §Hardware notes)
+        @ Capture mode pushed with Set Mode: SD / ZOOM store one 640x480 slot, HD stores 1280x960 across slots 0..3
         param CAMERA_MODE: CaptureMode default CaptureMode.SD
 
         @ Exposure pushed with Set Exposure, in steps of 89.5 us, 2..960 (camera default 672)
@@ -93,12 +94,13 @@ module KissCam {
         @ Ping the camera; reply counters and uptime go to events and telemetry. Accepted when not set up
         async command PING(pingType: PingType) hook
 
-        @ Capture an image into a slot, optionally the test pattern (needs READY). The ACK carries 0 (datasheet §7.4.5
-        @ response figure) or 2 (§7.4.5 prose) exposure bytes; CaptureComplete echoes the slot argument and the reply mode
+        @ Capture an image into a slot, optionally the test pattern (needs READY; in HD only SLOT_0, the camera fills slots 0..3).
+        @ The ACK carries 0 (datasheet §7.4.5 response figure) or 2 (§7.4.5 prose) exposure bytes; CaptureComplete echoes
+        @ the slot argument and the reply mode
         async command CAPTURE(slot: Slot, testPattern: TestPattern) hook
 
-        @ Download the image in a slot into one Image data product (needs READY): 480 (FULL) or 48 (PREVIEW) line
-        @ requests in order; the header mode is the first reply's mode byte
+        @ Download an image into one Image data product (needs READY): 480 (FULL) or 48 (PREVIEW) line requests in order
+        @ of the commanded slot, or of slots 0, 1, 2, 3 in HD (slot must be SLOT_0); the header mode is the first reply's mode byte
         async command DOWNLOAD(slot: Slot, resolution: Resolution) hook
 
         @ Stop the download in progress after the pending line; the lines received are still delivered (ACTIVITY_HI)
@@ -159,7 +161,7 @@ module KissCam {
             imageMode: Mode,
             resolution: Resolution,
             lines: U16,
-            bytes: U32 @< Image bytes received: lines x 640 (FULL) or x 64 (PREVIEW); not the serialized record bytes
+            bytes: U32 @< Image bytes received: lines x 640 (FULL) or x 64 (PREVIEW), all slots of an HD image; not the serialized record bytes
         ) severity activity high \
             format "Download of slot {} ({} image) at {} complete: {} lines, {} bytes"
 
@@ -178,7 +180,7 @@ module KissCam {
         event RegisterRead(address: U16, value: U16) severity activity high \
             format "Register 0x{x} = {}"
 
-        @ A ground command was rejected (response EXECUTION_ERROR, or BUSY for cause BUSY)
+        @ A ground command was rejected: NOT_READY, BUSY, NO_DOWNLOAD, HD_SLOT (response EXECUTION_ERROR, or BUSY for cause BUSY)
         event CommandRejected(operation: Operation, cause: RejectCause) severity warning low \
             format "{} rejected: {}"
 
