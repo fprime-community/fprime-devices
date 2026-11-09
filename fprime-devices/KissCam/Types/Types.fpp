@@ -53,6 +53,7 @@ module KissCam {
         SEND_FAILED = 2 @< The UART driver refused the command frame
         MODE_MISMATCH = 3 @< Reply mode differs from the commanded mode
         EXPOSURE_MISMATCH = 4 @< Register 0x3012 readback differs from the pushed EXPOSURE
+        OUT_OF_RANGE = 5 @< A persisted parameter is outside its Table 1 range; nothing was sent
     }
     @ Why a ground command was rejected
     enum RejectCause : U8 {
@@ -66,12 +67,12 @@ module KissCam {
         MALFORMED = 1 @< No start byte, bad length, or missing terminator
         WRONG_COMMAND = 2 @< Well-formed reply acknowledging a command other than the outstanding one
     }
-    @ Why a download ended before every line was received
-    enum AbortCause : U8 {
-        COMMANDED = 0 @< DOWNLOAD_ABORT
-        LINE_FAILED = 1 @< A line failed LINE_RETRIES re-requests
-        SEND_FAILED = 2 @< The UART driver refused a Download frame
-        PRODUCT_FULL = 3 @< The data-product container could not hold the next record
+    @ Why a download failed before every line was received (a commanded abort is DownloadAborted)
+    enum DownloadFailCause : U8 {
+        LINE_FAILED = 0 @< A line failed LINE_RETRIES re-requests
+        SEND_FAILED = 1 @< The UART driver refused a Download or Memory Status frame
+        PRODUCT_FULL = 2 @< The data-product container could not hold the next record
+        MEMORY_STATUS_FAILED = 3 @< The Memory Status exchange that identifies the image failed
     }
     @ Persisted camera settings (SDD Table 1)
     enum Setting : U8 {
@@ -130,11 +131,12 @@ module KissCam {
     }
     @ First record of every Image data product (SDD Table 4)
     struct ImageHeader {
-        slot: Slot
+        slot: Slot @< Slot commanded; for an HD image the first quadrant is slot 1 whatever was commanded
+        imageMode: Mode @< Stored image mode from Memory Status: SD (one slot) or HD (four quadrant slots)
         resolution: Resolution
-        width: U16 @< Pixels per line: 640 or 80
-        height: U16 @< Lines in a complete image: 480 or 60
-        cameraMode: Mode @< Camera mode at download time; whether the slot is an SD image or an HD quadrant comes from MemorySlots (Memory Status IMD)
-        linesExpected: U16 @< Lines requested; the record count tells how many were received
+        width: U16 @< Image width in pixels: 640 / 80 (SD), 1280 / 160 (HD)
+        height: U16 @< Image height in lines: 480 / 60 (SD), 960 / 120 (HD)
+        cameraMode: Mode @< Camera mode at download time (mode byte of the Download replies)
+        linesExpected: U16 @< ImageLine records in a complete product: 480 / 60 (SD), 1920 / 240 (HD, slots 1-4 in order)
     }
 }

@@ -25,9 +25,14 @@ module KissCam {
         # Framework services
         # ----------------------------------------------------------------------
 
-        @ Rate-group tick (10 Hz): reply timeouts are counted in these ticks (KissCamConfig.REPLY_TIMEOUT_TICKS).
-        @ Queue-full hook only counts the drop
-        async input port run: Svc.Sched hook
+        @ Rate-group tick (10 Hz), synchronous: the handler test-and-sets the atomic "run queued" flag and, when it
+        @ was clear, invokes runInternal — at most one run message is ever on the queue
+        sync input port run: Svc.Sched
+
+        @ The tick work on the component thread: reply timeouts (KissCamConfig.REPLY_TIMEOUT_TICKS), deferred
+        @ parameter push, periodic channels. The handler clears the atomic; the queue-full hook clears it too
+        @ and counts the drop (QueueInput.RUN_TICK)
+        internal port runInternal hook
 
         @ Health ping; queue-full hook only counts the drop
         async input port pingIn: Svc.Ping hook
@@ -58,10 +63,10 @@ module KissCam {
         @ First record of an Image product
         product record ImageHeader: KissCam.ImageHeader id 0
 
-        @ One image line as received: line number (2 bytes, MSB first) then 640 or 80 pixel bytes
+        @ One image line: slot (1 byte, the HD quadrant), line number (2 bytes, MSB first), then 640 or 80 pixel bytes
         product record ImageLine: U8 array id 1
 
-        @ One product per DOWNLOAD
+        @ One product per image: an SD slot, or all four quadrants of an HD image
         product container Image id 0 default priority KissCamConfig.IMAGE_DP_PRIORITY
 
         # ----------------------------------------------------------------------
@@ -95,11 +100,11 @@ module KissCam {
         @ ignores the slot and the image occupies slots 1-4; CaptureComplete echoes the argument and the mode
         async command CAPTURE(slot: Slot, testPattern: TestPattern) hook
 
-        @ Download every line of a slot into one Image data product (needs READY). An HD image is four
-        @ slot downloads reassembled on the ground; MEMORY_STATUS tells which slots hold HD quadrants
+        @ Download the image in a slot into one Image data product (needs READY): Memory Status first; an SD slot
+        @ is 480 (60 preview) lines, an HD image is its four quadrant slots 1-4 in order, 1920 (240) lines
         async command DOWNLOAD(slot: Slot, resolution: Resolution) hook
 
-        @ Stop the download in progress after the pending line; the lines received are still delivered
+        @ Stop the download in progress after the pending line; the lines received are still delivered (ACTIVITY_HI)
         async command DOWNLOAD_ABORT hook
 
         @ Read a 16-bit image sensor register (needs READY)
@@ -124,6 +129,10 @@ module KissCam {
         event SettingApplied(setting: Setting, value: U16) severity activity high \
             format "Camera setting {} applied: {}"
 
+        @ A parameter value outside its Table 1 range was refused before any camera frame; the applied value stands
+        event SettingRejected(setting: Setting, value: U16, min: U16, max: U16) severity warning low \
+            format "Camera setting {} value {} rejected: range {}..{}"
+
         @ A parameter push outside set-up failed; the component is NOT_SETUP
         event SettingPushFailed(setting: Setting, cause: FailCause) severity warning high \
             format "Camera setting {} push failed: {}; component NOT_SETUP"
@@ -146,17 +155,21 @@ module KissCam {
         event CaptureComplete(slot: Slot, testPattern: TestPattern, exposure: U16, mode: Mode) severity activity high \
             format "Captured slot {} (test pattern {}) at exposure {} in mode {}"
 
-        @ DOWNLOAD accepted
-        event DownloadStarted(slot: Slot, resolution: Resolution, lines: U16) severity activity low \
-            format "Download of slot {} at {} started: {} lines"
+        @ Memory Status answered, image mode known, product allocated
+        event DownloadStarted(slot: Slot, imageMode: Mode, resolution: Resolution, lines: U16) severity activity low \
+            format "Download of slot {} ({} image) at {} started: {} lines"
 
         @ Every line received; product sent
-        event DownloadComplete(slot: Slot, resolution: Resolution, lines: U16, bytes: U32) severity activity high \
-            format "Download of slot {} at {} complete: {} lines, {} bytes"
+        event DownloadComplete(slot: Slot, imageMode: Mode, resolution: Resolution, lines: U16, bytes: U32) severity activity high \
+            format "Download of slot {} ({} image) at {} complete: {} lines, {} bytes"
 
-        @ Download ended early; lines received so far were delivered when a product existed
-        event DownloadAborted(slot: Slot, linesReceived: U16, cause: AbortCause) severity warning low \
-            format "Download of slot {} aborted after {} lines: {}"
+        @ DOWNLOAD_ABORT ended the download; lines received so far were delivered
+        event DownloadAborted(slot: Slot, linesReceived: U16) severity activity high \
+            format "Download of slot {} aborted by command after {} lines"
+
+        @ The download ended early on a fault; lines received so far were delivered when a product existed
+        event DownloadFailed(slot: Slot, linesReceived: U16, cause: DownloadFailCause) severity warning high \
+            format "Download of slot {} failed after {} lines: {}"
 
         @ An image line is being re-requested
         event LineRetry(line: U16, attempt: U8) severity diagnostic format "Re-requesting line {} (attempt {})"
