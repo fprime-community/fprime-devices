@@ -31,7 +31,7 @@ implemented by the camera (§7.4.3) and is not commanded.
 | REQ-SunCamMgr-010 | Table 1 parameters changed while READY shall be pushed when no operation is in progress. | Unit Test |
 | REQ-SunCamMgr-011 | A failed parameter push shall return the component to NOT_SETUP with a WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-012 | Exposure shall be read back from register 0x3012 after every exposure push and reported. | Unit Test |
-| REQ-SunCamMgr-013 | `CAPTURE` shall send Capture with the commanded slot and test-pattern flag, accepting a 0- or 2-byte ACK. | Unit Test |
+| REQ-SunCamMgr-013 | `CAPTURE` shall send Capture with the commanded slot and test-pattern flag and accept the 0-byte ACK. | Unit Test |
 | REQ-SunCamMgr-014 | `DOWNLOAD` shall request every line of each Table 2 image slot in order. | Unit Test |
 | REQ-SunCamMgr-015 | A download shall produce one data product per image: Table 4 header, then slot-tagged line records. | Unit Test |
 | REQ-SunCamMgr-016 | A failed or timed-out line reply shall be retried LINE_RETRIES times before the download fails. | Unit Test |
@@ -50,9 +50,10 @@ implemented by the camera (§7.4.3) and is not commanded.
 | REQ-SunCamMgr-029 | A full queue shall drop the newest input: buffer returned, command answered BUSY, WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-030 | Component state and counter channels shall be written on change and every TLM_PERIOD_TICKS `run` ticks. | Unit Test |
 | REQ-SunCamMgr-031 | An out-of-range EXPOSURE shall send no frame; a push is refused, WARNING_LO event, READY kept. | Unit Test |
-| REQ-SunCamMgr-033 | A Capture outcome shall report the ACK's exposure when present, else the `Exposure` channel value. | Unit Test |
+| REQ-SunCamMgr-033 | A Capture outcome shall report the `Exposure` channel value as the exposure used. | Unit Test |
 | REQ-SunCamMgr-034 | The camera's power-on line (Table 4) received while READY shall cause NOT_SETUP with a WARNING_HI event. | Unit Test |
 | REQ-SunCamMgr-035 | In HD, `CAPTURE` and `DOWNLOAD` shall be rejected with a WARNING_LO event unless slot is SLOT_0. | Unit Test |
+| REQ-SunCamMgr-036 | Capture shall be sent only while READY. | Unit Test |
 
 Table 1 — Parameters (persisted camera settings, pushed at set-up and on change)
 
@@ -109,7 +110,7 @@ Table 4 — Constants and data-product records
 ```
  drvConnected : Drv.ByteStreamReady ─▶┌─────────────────────────────┐─▶ drvSendOut : Drv.ByteStreamSend
  drvReceiveIn : Drv.ByteStreamData  ─▶│     KissCam.SunCamMgr       │─▶ drvReceiveReturnOut : Fw.BufferSend
- run : Svc.Sched (sync → atomic → runInternal) ─▶│   (active)        │─▶ pingOut : Svc.Ping
+ run : Svc.Sched                    ─▶│          (active)           │─▶ pingOut : Svc.Ping
  pingIn : Svc.Ping                  ─▶└─────────────────────────────┘─▶ productGetOut, productSendOut (data products)
 ```
 ### Ports
@@ -143,7 +144,7 @@ the doc-comment; data-product records are Table 4 (`ImageHeader` struct, `ImageL
 | ExposureReadback(pushed, readback) | ACTIVITY_LO | register 0x3012 read after an exposure push |
 | SleepEntered | ACTIVITY_HI | Set Mode Sleep acknowledged; NOT_SETUP |
 | PingReply(pingType, validCmds, invalidCmds, uptime) | ACTIVITY_LO | Ping acknowledged |
-| CaptureComplete(slot, testPattern, exposure, mode) | ACTIVITY_HI | Capture acknowledged (slot as sent; exposure = the ACK's 2-byte value when present, else the last pushed/read-back exposure) |
+| CaptureComplete(slot, testPattern, exposure, mode) | ACTIVITY_HI | Capture acknowledged (slot as sent; exposure = the `Exposure` channel value, the last pushed/read-back exposure) |
 | DownloadStarted(slot, imageMode, resolution, lines) | ACTIVITY_LO | first line reply received: imageMode = its mode byte, ImageHeader record written (the product was allocated at the command) |
 | DownloadComplete(slot, imageMode, resolution, lines, bytes) | ACTIVITY_HI | last line stored, product sent; bytes = image bytes received (lines × 640 or × 64), not serialized record bytes |
 | DownloadAborted(slot, linesReceived) | ACTIVITY_HI | DOWNLOAD_ABORT ended the download; lines received delivered |
@@ -194,8 +195,10 @@ component), others are counted as discarded and returned when they carry data (a
 final 0x0D; image payloads may contain 0x0D) is satisfied. Bytes outside a frame, and a frame whose length field exceeds the assembler or whose last byte is not 0x0D, are skipped up to the next 0x40 or the end of the receive buffer and reported as one `FrameDiscarded(MALFORMED)` carrying their count and first 8 bytes; a reply left incomplete when its exchange times out is discarded `MALFORMED`; a Download reply whose payload is not the 2-byte line echo plus exactly the expected pixel count (640 full, 64 preview) is discarded `MALFORMED` and not stored, so the line fails by the reply timeout and is re-requested (REQ-SunCamMgr-016); and a fragment still in the assembler when the next exchange starts is discarded `NO_OPERATION`; a reply whose payload length, error type or mode byte cannot be decoded is discarded the same way and the exchange stays pending. The exact 21-byte POWER_ON_LINE (Table 4), recognised among the discarded bytes whether it arrives in one receive buffer or across several (the discard path matches it byte by byte), means the camera has restarted in Sleep: while READY or SETTING_UP the component emits `CameraRestarted(operation)` (WARNING_HI) and becomes NOT_SETUP, and the exchange in progress fails at once with cause CAMERA_RESTART — `SetupFailed(step, CAMERA_RESTART)` / `SettingPushFailed(setting, CAMERA_RESTART)`, a download ends with `DownloadFailed(slot, linesReceived, CAMERA_RESTART)` and the lines received are delivered, a Table 2 command answers EXECUTION_ERROR; while NOT_SETUP the line is REQ-020 noise only, counted and discarded. A complete reply is matched to the outstanding command byte and
 to every parameter it echoes (Download line number, Read Register address) — a mismatch, or a reply after its exchange
 timed out, is discarded (WRONG_COMMAND / NO_OPERATION; replies carry no sequence number, so a late reply to a re-sent
-command of the same byte and echo is indistinguishable) — then mode-checked (against the mode just set for a Set Mode reply, otherwise the commanded mode) and decoded into events and channels. A Capture ACK with no payload (the §7.4.5 response figure) is nominal: `CaptureComplete.exposure` is the
-component's last pushed or read-back exposure; a 2-byte payload (the §7.4.5 prose) is decoded and reported instead. `run`
+command of the same byte and echo is indistinguishable) — then mode-checked (against the mode just set for a Set Mode reply, otherwise the commanded mode) and decoded into events and channels. The Capture ACK carries no payload (the §7.4.5 response figure): `CaptureComplete.exposure` is the
+`Exposure` channel value, the component's last pushed or read-back exposure; a Capture reply with any other payload length is discarded `MALFORMED`, so the
+exchange ends by `ReplyTimeout(CAPTURE, 0x43)` and the command answers EXECUTION_ERROR. Capture leaves the component only while READY (REQ-036): NOT_SETUP
+— before set-up, after SLEEP, after `CameraRestarted` — rejects it NOT_READY without a frame. `run`
 ticks count a per-exchange timeout; on expiry or a 0xFF reply the exchange fails and the operation ends per the
 requirements (set-up/push → NOT_SETUP; download line → `LineRetry`, then `DownloadFailed`), while a download allocates one
 product for the image at the command — SD/Zoom: the commanded slot, FULL_LINES / PREVIEW_LINES line requests; HD: slots 0, 1, 2, 3 in order, 4 × FULL_LINES / 4 × PREVIEW_LINES (the slot argument must be SLOT_0, REQ-035 — required rather than ignored so a wrong slot argument is reported, not silently accepted; the camera writes an HD image across all four slots and ignores the Capture slot) —
@@ -304,10 +307,10 @@ _Generated by `fth render-sdd-tests` from the plan — do not edit by hand; the 
 | L3-1 | EXPOSURE persists across a restart | REQ-SunCamMgr-003, REQ-SunCamMgr-005, REQ-SunCamMgr-010, REQ-SunCamMgr-027 |
 | L5-1 | Busy rejection and commanded download abort | REQ-SunCamMgr-009, REQ-SunCamMgr-017 |
 | L5-3 | Out-of-range exposure refused locally; set-up fails before Set Exposure | REQ-SunCamMgr-002, REQ-SunCamMgr-004, REQ-SunCamMgr-031 |
-| L6-1 | Negative control: READY-only commands refused while NOT_SETUP | REQ-SunCamMgr-002, REQ-SunCamMgr-007, REQ-SunCamMgr-008, REQ-SunCamMgr-026 |
+| L6-1 | Negative control: READY-only commands refused while NOT_SETUP | REQ-SunCamMgr-002, REQ-SunCamMgr-007, REQ-SunCamMgr-008, REQ-SunCamMgr-026, REQ-SunCamMgr-036 |
 | L6-2 | Negative control: DOWNLOAD_ABORT with no download | REQ-SunCamMgr-026 |
 | L7-1 | Final state: test-pattern capture, preview product on disk | REQ-SunCamMgr-001, REQ-SunCamMgr-013, REQ-SunCamMgr-015 |
-| L8-1 | Camera power-on (human step) → set-up | REQ-SunCamMgr-003, REQ-SunCamMgr-020, REQ-SunCamMgr-034 |
+| L8-1 | Camera power-on (human step) → set-up | REQ-SunCamMgr-003, REQ-SunCamMgr-020, REQ-SunCamMgr-034, REQ-SunCamMgr-036 |
 <!-- fth:tests:end -->
 
 ### Unit-test list
@@ -318,12 +321,13 @@ _Generated by `fth render-sdd-tests` from the plan — do not edit by hand; the 
 | testSetupFailsEachStep | Timeout or 0xFF at every step, and out-of-range EXPOSURE before Set Exposure → NOT_SETUP, SetupFailed(step, cause) | REQ-SunCamMgr-004, REQ-SunCamMgr-018, REQ-SunCamMgr-019 |
 | testSetupReentrant | SETUP_CAMERA while READY and after a failed set-up repeats the full sequence | REQ-SunCamMgr-005 |
 | testNoFramesBeforeSetup | No UART frame leaves before SETUP_CAMERA; READY-only commands rejected NOT_READY | REQ-SunCamMgr-002, REQ-SunCamMgr-008 |
+| testNoCaptureWhenNotSetup | CAPTURE before set-up, after SLEEP and after CameraRestarted → CommandRejected(CAPTURE, NOT_READY), no frame on drvSendOut, ImagesCaptured unchanged | REQ-SunCamMgr-036, REQ-SunCamMgr-008 |
 | testSleepAndPingNotSetup | SLEEP and PING exchange from NOT_SETUP; SLEEP ends NOT_SETUP on success and failure | REQ-SunCamMgr-006, REQ-SunCamMgr-007 |
 | testBusyRejection | Every command during an operation answers BUSY except DOWNLOAD_ABORT | REQ-SunCamMgr-009 |
 | testParameterPushIdleOnly | Change during an operation deferred to the next idle READY tick; change while NOT_SETUP applied only by SETUP_CAMERA | REQ-SunCamMgr-010 |
 | testParameterPushFailure | Push timeout / error → NOT_SETUP, SettingPushFailed | REQ-SunCamMgr-011 |
 | testExposureReadbackMismatch | Readback ≠ pushed value → NOT_SETUP, ExposureReadback with both values | REQ-SunCamMgr-012, REQ-SunCamMgr-028 |
-| testCaptureReportsExposure | 0-byte ACK → CaptureComplete(slot, testPattern, last pushed/read-back exposure, mode); 2-byte ACK → the ACK's exposure; ImagesCaptured both times | REQ-SunCamMgr-013, REQ-SunCamMgr-033 |
+| testCaptureReportsExposure | 0-byte ACK → CaptureComplete(slot, testPattern, Exposure channel value, mode), ImagesCaptured +1; an ACK with a 2-byte payload → FrameDiscarded(MALFORMED), ReplyTimeout(CAPTURE), EXECUTION_ERROR, no CaptureComplete | REQ-SunCamMgr-013, REQ-SunCamMgr-033 |
 | testCommandFrameBytes | Every Table 2 command and Table 1 push leaves as the 7-byte §7.4.x frame, byte for byte | REQ-SunCamMgr-001 |
 | testChannelsFromReplies | Each Table 3 channel equals its named reply field (uptime, RXV/RXF, RegisterValue, LastCameraError, counters) | REQ-SunCamMgr-022 |
 | testOutcomeEventPerCommand | Every Table 2 command's OK and rejected outcome has its event with the named arguments | REQ-SunCamMgr-023 |

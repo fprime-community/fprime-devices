@@ -95,8 +95,8 @@ module KissCam {
         async command PING(pingType: PingType) hook
 
         @ Capture an image into a slot, optionally the test pattern (needs READY; in HD only SLOT_0, the camera fills slots 0..3).
-        @ The ACK carries 0 (datasheet §7.4.5 response figure) or 2 (§7.4.5 prose) exposure bytes; CaptureComplete echoes
-        @ the slot argument and the reply mode
+        @ The ACK carries no payload (datasheet §7.4.5 response figure); CaptureComplete echoes the slot argument and the
+        @ reply mode and reports the Exposure channel value. Sent only while READY (REQ-036)
         async command CAPTURE(slot: Slot, testPattern: TestPattern) hook
 
         @ Download an image into one Image data product (needs READY): 480 (FULL) or 48 (PREVIEW) line requests in order
@@ -147,7 +147,7 @@ module KissCam {
         event PingReply(pingType: PingType, validCmds: U8, invalidCmds: U8, uptime: U16) severity activity low \
             format "Camera ping {}: {} valid, {} invalid commands, uptime {} s"
 
-        @ Capture acknowledged; exposure = the ACK's exposure when it carries 2 bytes, else the last pushed or read-back exposure
+        @ Capture acknowledged; exposure = the Exposure channel value (the last pushed or read-back exposure; the ACK carries none)
         event CaptureComplete(slot: Slot, testPattern: TestPattern, exposure: U16, mode: Mode) severity activity high \
             format "Captured slot {} (test pattern {}) at exposure {} in mode {}"
 
