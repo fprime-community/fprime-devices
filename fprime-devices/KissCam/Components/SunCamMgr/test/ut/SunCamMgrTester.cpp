@@ -883,8 +883,12 @@ void SunCamMgrTester::testDownloadLineRetryAndFail() {
     this->lineReply(2, PREVIEW_PIXELS - 1, 2);
     this->lineReply(2, PREVIEW_PIXELS + 1, 2);
     ASSERT_EVENTS_FrameDiscarded_SIZE(2);
-    ASSERT_EQ(this->eventHistory_FrameDiscarded->at(0).cause, DiscardCause::MALFORMED);
-    ASSERT_EQ(this->eventHistory_FrameDiscarded->at(1).cause, DiscardCause::MALFORMED);
+    ASSERT_EVENTS_FrameDiscarded(0, DiscardCause::MALFORMED, 87,
+                                 head(0x40, CMD_DOWNLOAD, 0x01, 0x00, 0x51, 0x00, 0x02, 0x02));
+    ASSERT_EVENTS_FrameDiscarded(1, DiscardCause::MALFORMED, 89,
+                                 head(0x40, CMD_DOWNLOAD, 0x01, 0x00, 0x53, 0x00, 0x02, 0x02));
+    ASSERT_EQ(this->tlmHistory_MalformedReplies->at(this->tlmHistory_MalformedReplies->size() - 1).arg, 2u);
+    ASSERT_EQ(this->tlmHistory_DiscardedBytes->at(this->tlmHistory_DiscardedBytes->size() - 1).arg, 176u);
     ASSERT_EVENTS_LineRetry_SIZE(0);
     this->assertFrame(CMD_DOWNLOAD, 1, 1, 0, 2, 9);
     for (U8 attempt = 1; attempt <= KissCamConfig::LINE_RETRIES; attempt++) {
@@ -1000,6 +1004,14 @@ void SunCamMgrTester::testDownloadAbortCommanded() {
     this->startDownload(Slot::SLOT_3, Resolution::FULL, 2);
     this->lineReply(0, FULL_PIXELS, 0);
     this->lineReply(1, FULL_PIXELS, 1);
+    // the pixel-count check follows the full-resolution line length too
+    {
+        const U32 frames = this->m_frameCount;
+        this->lineReply(2, FULL_PIXELS - 1, 2);
+        ASSERT_EVENTS_FrameDiscarded_SIZE(1);
+        ASSERT_EQ(this->eventHistory_FrameDiscarded->at(0).cause, DiscardCause::MALFORMED);
+        ASSERT_EQ(this->m_frameCount, frames);
+    }
     this->sendCmd_DOWNLOAD_ABORT(0, 3);
     this->dispatch();
     ASSERT_CMD_RESPONSE_SIZE(0);  // the pending line is still awaited
