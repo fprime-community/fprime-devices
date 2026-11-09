@@ -116,9 +116,9 @@ Table 4 — Constants and data-product records
 
 Special ports: cmdIn/cmdRegOut/cmdResponseOut, eventOut/textEventOut, tlmOut, timeGetOut, prmGetOut/prmSetOut. All eight
 commands (Table 2) are `async` with queue-full `hook`. Hooks run in the caller's thread and do only this: a command hook
-answers `cmdResponse BUSY`, the `drvReceiveIn` hook returns the buffer, and every hook increments a mutex-guarded drop
-count — no other member is touched; the component thread reads the count on its next tick, emits `QueueOverflow` and
-updates `QueueOverflows` (REQ-029). Parameters are Table 1; telemetry is Table 3, one channel per FPP row with units in
+answers `cmdResponse BUSY`, the `drvReceiveIn` hook returns the buffer, and every hook increments its source's
+mutex-guarded drop count (one per `QueueInput`) — no other member is touched; on its next tick the component thread emits
+one `QueueOverflow(source, dropped)` per non-zero source and adds the sum to `QueueOverflows` (REQ-029). Parameters are Table 1; telemetry is Table 3, one channel per FPP row with units in
 the doc-comment; data-product records are Table 4 (`ImageHeader` struct, `ImageLine` `U8 array`, container `Image`).
 
 ### Events
@@ -159,27 +159,29 @@ constant IMAGE_DP_PRIORITY = 10     # default priority of the Image container
 instance sunCamMgr: KissCam.SunCamMgr base id 0x... queue size 64 stack size 65536 priority 100
 ```
 Image container size per DOWNLOAD: `Header::SIZE + 2·hash + SIZE_OF_ImageHeader_RECORD + lines × SIZE_OF_ImageLine_RECORD
-(2 + pixels)` ≈ 312 KB full, ≈ 5.5 KB preview; the data-product buffer manager needs one bin ≥ 320 KB. Queue depth: a
-648-byte reply can arrive in up to N ≤ 648 driver reads (VMIN=0/VTIME=10, one 1024-byte buffer each); the component runs at
-a higher priority than the driver's read task so the queue drains per buffer, and the UART buffer manager holds ≥ 8 × 1024 B
-(N measured on the bench at stage 2). Durations: DOWNLOAD FULL ≈ 30 s nominal, PREVIEW ≈ 1 s; worst case
-lines × (LINE_RETRIES + 1) × 2 s — sequence timeouts go above it.
+(2 + pixels)` ≈ 312 KB full, ≈ 5.5 KB preview; the data-product buffer manager needs one bin ≥ 320 KB. Each queued receive
+holds one UART pool buffer, so UART_RECEIVE cannot overflow a queue at least as deep as the pool; if it does overflow, the
+dropped buffers are returned, the reply fails as malformed and the line is retried. Pool depth and queue size are set from
+the bench-measured buffers-per-reply N (stage 2) with 2× margin, independent of task priorities (Linux honours them only
+with RT scheduling rights); download durations and sequence timeouts are deployment matters (topology SDD).
+REPLY_TIMEOUT_TICKS and LINE_RETRIES are compile-time by design: the timeout is the datasheet's fixed 2000 ms, LINE_RETRIES
+only bounds an abort the operator can re-command; both are deployment overrides, not flight parameters.
 
 ### Behavior
 A command is checked against Table 2 and `CurrentOperation`; a refusal emits `CommandRejected`, otherwise it becomes the
 operation in progress, its first 7-byte frame leaves on `drvSendOut` from the component's own buffer, and its command
-response is deferred to the operation's end (SLEEP ends in NOT_SETUP whether or not its exchange succeeds, and its reply is
-exempt from the mode check). Receive buffers (only status OP_OK ones; others are returned and counted as discarded) are
-appended to a component-local 648-byte assembler that never indexes past its end and resyncs on the next 0x40 — a reply is
-complete when the length field (excluding the final 0x0D; image payloads may contain 0x0D) is satisfied, then matched to the
-outstanding command byte (and, for Download, the requested line number; a reply arriving after its exchange timed out is
-discarded NO_OPERATION), mode-checked and decoded into events and channels. `run` ticks count a per-exchange timeout; on
-expiry or a 0xFF reply the exchange fails and the operation ends per the requirements (set-up/push → NOT_SETUP; download
-line → `LineRetry`, then abort). A download allocates its product first, adds one `ImageLine` record per reply and sends the
-product on completion or abort; a push reads both parameters once at its start, compares the readback with the value sent
-in the Set Exposure frame, and `parameterUpdated` only sets a guarded dirty flag that the `run` handler acts on while idle
-(`CAMERA_MODE` then `EXPOSURE` + readback). On its first tick the component reports SetupState NOT_SETUP, CurrentOperation
-NONE and zero counters; camera-sourced channels appear only after a camera reply.
+response is deferred to the operation's end. SLEEP ends in NOT_SETUP whether or not its exchange succeeds, and its reply is
+exempt from the mode check. Receive buffers with status OP_OK are appended to a component-local 648-byte assembler
+(rather than `Svc.FrameAccumulator`, whose `ComDataWithContext` ports would need an adapter and a second topology
+component); others are returned and counted as discarded. A reply is complete when the length field (excluding the final
+0x0D; image payloads may contain 0x0D) is satisfied; it is then matched to the outstanding command byte — and the requested
+line number for Download — mode-checked and decoded into events and channels. A reply arriving after its exchange timed out
+is discarded NO_OPERATION unless a new exchange with the same command byte has begun (replies carry no sequence number).
+`run` ticks count a per-exchange timeout; on expiry or a 0xFF reply the exchange fails and the operation ends per the
+requirements (set-up/push → NOT_SETUP; download line → `LineRetry`, then abort). A download allocates its product first,
+adds one `ImageLine` record per reply and sends the product on completion or abort. `parameterUpdated` only sets a guarded
+dirty flag; the `run` handler pushes while idle (`CAMERA_MODE`, then `EXPOSURE` + readback). On its first tick the component
+reports SetupState NOT_SETUP, CurrentOperation NONE and zero counters; camera-sourced channels appear only after a reply.
 
 ```mermaid
 sequenceDiagram

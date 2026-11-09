@@ -207,7 +207,7 @@ module KissCam {
         telemetry CurrentOperation: Operation
         @ Camera mode from the mode byte of the last reply
         telemetry CameraMode: Mode
-        @ EXPOSURE value the camera acknowledged, or the exposure of the last Capture reply (steps of 89.5 us)
+        @ EXPOSURE value the camera acknowledged, or the exposure of the last Capture reply (steps of 89.5 us; 0 after a test-pattern capture)
         telemetry Exposure: U16
         @ Sensor register 0x3012 from the last readback (steps of 89.5 us)
         telemetry ExposureReadback: U16
@@ -239,7 +239,7 @@ module KissCam {
         telemetry LinesDownloaded: U32
         @ Image data products sent (since boot)
         telemetry ProductsSent: U32
-        @ Inputs dropped by queue-full hooks (since boot; mutex-guarded count read on the run tick)
+        @ Inputs dropped by queue-full hooks (since boot): sum of the per-source mutex-guarded counts, read on the run tick
         telemetry QueueOverflows: U32
     }
 }
