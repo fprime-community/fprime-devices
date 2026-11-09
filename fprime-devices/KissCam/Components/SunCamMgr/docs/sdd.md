@@ -10,7 +10,7 @@ readout as one F Prime data product (one slot per product; on our hardware an HD
 one other command/reply exchange; at most one operation is in progress at a time. The camera is powered by another component, so the operator calls
 `SETUP_CAMERA` once it is on; until then the component is NOT_SETUP.
 
-Device identity: KissCAM V2 Datasheet and User Manual, Revision 1.1 (April 2023). Bench unit on `/dev/ttyUSB0`
+Device identity: KissCAM V2 Datasheet and User Manual, Revision 1.3 (May 2025; Rev 1.2 of May 2024 is the point of change, Rev 1.1 of April 2023 is superseded). Bench unit on `/dev/ttyUSB0`
 (FTDI USB-RS422 cable FTAQMGVF): Ping reply `40 50 00 00 04 01 00 94 d1 0d` = ACK `P`, mode Sleep, 1 valid / 0 invalid
 commands, uptime 38097 s — the datasheet's §7.4.1 reply format. At power-on the unit emits exactly 21 unframed ASCII bytes,
 `4d 56 50 20 43 61 6d 65 72 61 20 56 32 20 52 53 34 32 32 0d 0a` = "MVP Camera V2 RS422\r\n" (bench capture 2026-11-09, H7): the
@@ -30,11 +30,25 @@ guaranteed; H6 reply mode byte, Ping, Set Mode, Set Exposure, Read Register 0x30
 "MVP Camera V2 RS422\r\n" (21 unframed bytes, undocumented). Where the
 bench disagrees with the datasheet the bench is the truth; §Not supported on our hardware records each discrepancy.
 
+Datasheet input corrected (phase 2). The design was first written against Rev 1.1; the authoritative input is now Rev 1.3
+(Rev 1.2 → 1.3 unchanged in the points below). Rev 1.3 confirms H1 and H2 as documented behaviour: §7.4.3 Memory Status "is
+planned future functionality and is not currently implemented" (command table §7.3 still lists 0x54 'S'; the bench answers
+unrecognised command to 0x53 and 0x54 alike), and the §7.4.5 Capture response figure is `40 43 MD 00 00 0D` — 0 telemetry
+bytes — while the §7.4.5 prose still says "ACK with two telemetry bytes indicating the exposure" (internally inconsistent, so
+REQ-013/-033 accept 0 or 2). Rev 1.3 also defines four modes, §6.2/§7.4.2: 0 Sleep, 1 SD, 2 Zoom (centre 640 × 480 crop),
+3 HD (1280 × 960 across all four slots, downloaded as four SD images, Capture slot ignored; the Figure 5 caption "1280 x 640"
+is a typo); a mode change resets the sensor registers including exposure to defaults (REQ-027's CAMERA_MODE → EXPOSURE push is
+spec-backed); the Capture table says Memory Slot 0-3 where the prose and Download say 1-4 (inconsistent, probes-5 decides);
+preview is still 80 × 60 / 60 lines (the bench's 64 × 48 stays a hardware discrepancy); error type 0x03 = wrong mode; MRAM
+16 Mb. Our earlier "HD" probes sent mode byte 2, which Rev 1.3 defines as Zoom, so H5 is re-measured by probes-5 (phase C):
+`Mode` (ZOOM = 2, HD = 3), HD four-slot behaviour and slot indexing follow that result; the HD and Zoom rows of §Not
+supported are pending until then.
+
 ## Requirements
 
 | ID | Requirement | Verification |
 |---|---|---|
-| REQ-SunCamMgr-001 | Frames sent and parsed shall comply with Datasheet Rev. 1.1 §7 as corrected by bench facts H1–H6. | Unit Test |
+| REQ-SunCamMgr-001 | Frames sent and parsed shall comply with Datasheet Rev. 1.3 §7 as corrected by bench facts H1–H7. | Unit Test |
 | REQ-SunCamMgr-002 | Camera frames shall be sent only for a Table 2 command or Table 1 push. | Unit Test |
 | REQ-SunCamMgr-003 | `SETUP_CAMERA` shall run the Table 2 set-up exchanges in order, then become READY. | Unit Test |
 | REQ-SunCamMgr-004 | A failed set-up step shall return the component to NOT_SETUP with a WARNING_HI event. | Unit Test |
@@ -82,7 +96,7 @@ Table 2 — Commands (ground operations)
 | SETUP_CAMERA | — | no | set-up steps, in order: Ping MCU, Set Mode, Set Exposure (preceded by the local EXPOSURE range check), Read Register 0x3012, Ping MCU+sensor |
 | SLEEP | — | no | Set Mode Sleep |
 | PING | type: MCU, MCU_AND_SENSOR | no | Ping |
-| MEMORY_STATUS | — | yes | Memory Status (standalone; on our hardware the camera answers UNRECOGNISED_COMMAND → `CameraError`, §Not supported) |
+| MEMORY_STATUS | — | yes | Memory Status (standalone; Rev 1.3 §7.4.3: not implemented — the camera answers UNRECOGNISED_COMMAND → `CameraError`, the L5-2 camera-error stimulus) |
 | CAPTURE | slot: SLOT_1..SLOT_4, testPattern: OFF/ON | yes | Capture |
 | DOWNLOAD | slot: SLOT_1..SLOT_4, resolution: FULL/PREVIEW | yes | Download × 480 (full) or × 48 (preview) of the commanded slot, no Memory Status |
 | DOWNLOAD_ABORT | — | no (accepted only during a download) | none; the download stops after the pending line |
@@ -100,7 +114,7 @@ Table 3 — Telemetry
 | CameraUptime | U16 s | Ping reply |
 | RegisterValue | {address, value} | READ_REGISTER command reply |
 | CameraValidCmds, CameraInvalidCmds | U8 | Ping / error replies |
-| MemorySlots | array[4] of {mode (same enum), exposure, uptime} | Memory Status reply (never written on our hardware, §Not supported) |
+| MemorySlots | array[4] of {mode (same enum), exposure, uptime} | Memory Status reply (Rev 1.3 §7.4.3 format; never written while Memory Status is unimplemented) |
 | LastCameraError | {command, errorType, count} | error reply |
 | Exchanges, CameraErrors, Timeouts, DiscardedBytes, MalformedReplies | U32 | component counters |
 | ImagesCaptured, LinesDownloaded, ProductsSent, QueueOverflows | U32 | component counters |
@@ -158,7 +172,7 @@ the doc-comment; data-product records are Table 4 (`ImageHeader` struct, `ImageL
 | ExposureReadback(pushed, readback) | ACTIVITY_LO | register 0x3012 read after an exposure push |
 | SleepEntered | ACTIVITY_HI | Set Mode Sleep acknowledged; NOT_SETUP |
 | PingReply(pingType, validCmds, invalidCmds, uptime) | ACTIVITY_LO | Ping acknowledged |
-| MemoryStatusReply(slots) | ACTIVITY_LO | Memory Status acknowledged (not reachable on our hardware, §Not supported) |
+| MemoryStatusReply(slots) | ACTIVITY_LO | Memory Status acknowledged (Rev 1.3 §7.4.3: not implemented, never seen) |
 | CaptureComplete(slot, testPattern, exposure, mode) | ACTIVITY_HI | Capture acknowledged (slot as sent; exposure = the ACK's 2-byte value when present, else the last pushed/read-back exposure) |
 | DownloadStarted(slot, imageMode, resolution, lines) | ACTIVITY_LO | first line reply received: imageMode = its mode byte, ImageHeader record written (the product was allocated at the command) |
 | DownloadComplete(slot, imageMode, resolution, lines, bytes) | ACTIVITY_HI | last line stored, product sent; bytes = image bytes received (lines × 640 or × 64), not serialized record bytes |
@@ -209,11 +223,11 @@ component), others are counted as discarded and returned when they carry data (a
 final 0x0D; image payloads may contain 0x0D) is satisfied. Bytes outside a frame (for example the unframed power-on banner, H7, which arrives whenever the camera is powered while the component is receiving), and a frame whose length field exceeds the assembler or whose last byte is not 0x0D, are skipped up to the next 0x40 or the end of the receive buffer and reported as one `FrameDiscarded(MALFORMED)` carrying their count and first 8 bytes; a reply left incomplete when its exchange times out is discarded `MALFORMED`; a Download reply whose payload is not the 2-byte line echo plus exactly the expected pixel count (640 full, 64 preview) is discarded `MALFORMED` and not stored, so the line fails by the reply timeout and is re-requested (REQ-SunCamMgr-016); and a fragment still in the assembler when the next exchange starts is discarded `NO_OPERATION`; a reply whose payload length, Memory Status mode bytes, error type or mode byte cannot be decoded is discarded the same way and the exchange stays pending. A complete reply is matched to the outstanding command byte and
 to every parameter it echoes (Download line number, Read Register address) — a mismatch, or a reply after its exchange
 timed out, is discarded (WRONG_COMMAND / NO_OPERATION; replies carry no sequence number, so a late reply to a re-sent
-command of the same byte and echo is indistinguishable) — then mode-checked (against the mode just set for a Set Mode reply, otherwise the commanded mode) and decoded into events and channels. A Capture ACK with no payload (bench, H2) is nominal: `CaptureComplete.exposure` is the
-component's last pushed or read-back exposure; a 2-byte payload (datasheet §7.4.5) is decoded and reported instead. `run`
+command of the same byte and echo is indistinguishable) — then mode-checked (against the mode just set for a Set Mode reply, otherwise the commanded mode) and decoded into events and channels. A Capture ACK with no payload (Rev 1.3 §7.4.5 response figure `40 43 MD 00 00 0D`, bench H2) is nominal: `CaptureComplete.exposure` is the
+component's last pushed or read-back exposure; a 2-byte payload (the §7.4.5 prose) is decoded and reported instead. `run`
 ticks count a per-exchange timeout; on expiry or a 0xFF reply the exchange fails and the operation ends per the
 requirements (set-up/push → NOT_SETUP; download line → `LineRetry`, then `DownloadFailed`), while a download allocates one
-product for the commanded slot at the command (FULL_LINES / PREVIEW_LINES; no Memory Status — the camera does not implement it, H1),
+product for the commanded slot at the command (FULL_LINES / PREVIEW_LINES; no Memory Status — Rev 1.3 §7.4.3: not implemented, H1),
 writes the `ImageHeader` record and emits `DownloadStarted` when the first line reply arrives (its mode byte is `imageMode`; a later
 reply whose mode byte differs is a `ModeMismatch`, REQ-021; the component's last pushed/read-back exposure is `exposure`), adds one `ImageLine` record (slot, line, pixels) per reply and sends the product on completion,
 `DownloadAborted` (commanded, ACTIVITY_HI) or `DownloadFailed` (WARNING_HI). EXPOSURE is range-checked by the component:
@@ -278,24 +292,22 @@ Out-of-scope failure modes
 | Data-product storage, cataloguing and downlink | Svc.DpManager / DpWriter / DpCatalog |
 
 ### Not supported on our hardware
-The bench unit (Introduction, "Revision for hardware") does not implement these datasheet features. Each row is a design
-decision: the component is built for the hardware we have, not for the datasheet.
+The bench unit (Introduction, "Revision for hardware") differs from Datasheet Rev 1.3 in these points. Each row is a design
+decision: the component is built for the hardware we have, not for the datasheet. Memory Status and the 0-byte Capture ACK
+are no longer discrepancies — Rev 1.3 documents both (§7.4.3 "not currently implemented", §7.4.5 response figure) — and are
+specified as normal behaviour above; Memory Status stays the standalone `MEMORY_STATUS` command and the L5-2 camera-error stimulus.
 
 | Feature | Datasheet ref | Observed bench behavior (bench probe, probes-1..3 / dry-1,2 records) | Disposition in this design |
 |---|---|---|---|
-| Memory Status command (`S`, 0x53; command table 0x54) | §7.3, §7.4.3 | Both bytes answer `40 FF <mode> 00 03 <cmd> 01 <count> 0D`: error type 1, unrecognised command (H1) | Not used by DOWNLOAD (REQ-014). `MEMORY_STATUS` kept as a standalone command (recommendation, see below): on this unit it ends in `CameraError(MEMORY_STATUS, …, UNRECOGNISED_COMMAND)`, EXECUTION_ERROR, READY kept — the only reproducible camera-error stimulus (system test L5-2). `MemoryStatusReply` and `MemorySlots` stay in the model for a datasheet-conformant unit; never seen here. |
-| Capture ACK exposure bytes | §7.4.5 | `40 43 <mode> 00 00 0D`: 0 payload bytes; the image is stored (H2) | 0-byte ACK nominal; 2-byte ACK also accepted and its exposure reported (REQ-013) |
-| Preview image 80 × 60 | §7.4.6 | Preview line = 2-byte echo + 64 px (LEN 0x0042); 48 lines; lines ≥ 48 return live sensor data of the next region, never an error (H3) | Preview = 64 × 48 everywhere (Resolution.PREVIEW, ImageHeader, product sizes, plan PNGs) |
-| HD image = four quadrant slots, 1280 × 960 | §6.2, Fig. 3, §7.4.5 | Only the reply mode byte changes (02); an HD Capture writes one 640 × 480 / 64 × 48 slot; slots 2-3 keep their SD content; slot 4 not guaranteed after an HD capture (H5) | Four-slot assembly dropped — option (a) below; an HD-mode image is one slot whose header `imageMode` is HD. REQ-032, the unit tests `testDownloadHdImage` / `testDownloadNoImage` (replaced by `testDownloadHdSingleSlot`) and `DownloadFailCause.NO_IMAGE` / `MEMORY_STATUS_FAILED` withdrawn. Operator note: after an HD capture re-capture slot 4 before trusting it. |
+| Preview image 80 × 60 | §7.4.6 (Rev 1.1–1.3) | Preview line = 2-byte echo + 64 px (LEN 0x0042); 48 lines; lines ≥ 48 return live sensor data of the next region, never an error (H3) | Preview = 64 × 48 everywhere (Resolution.PREVIEW, ImageHeader, product sizes, plan PNGs) |
+| HD image = four quadrant slots, 1280 × 960 — PENDING probes-5 (phase C) | §6.2, §7.4.2 (Rev 1.3: mode 3 HD; mode 2 is Zoom), Fig. 3, §7.4.5 | Only the reply mode byte changes (02); an HD Capture writes one 640 × 480 / 64 × 48 slot; slots 2-3 keep their SD content; slot 4 not guaranteed after an HD capture (H5) | Four-slot assembly dropped — option (a) below; an HD-mode image is one slot whose header `imageMode` is HD. REQ-032, the unit tests `testDownloadHdImage` / `testDownloadNoImage` (replaced by `testDownloadHdSingleSlot`) and `DownloadFailCause.NO_IMAGE` / `MEMORY_STATUS_FAILED` withdrawn. Operator note: after an HD capture re-capture slot 4 before trusting it. |
 | Camera-side parameter validation / error replies for bad slot, line, exposure, register | §7.4.9 (error types 2, 3) | Download slot 5 / line 480 / line 481, Set Exposure 0, Capture slot 0, Read Register 0xFFFF all answer normal frames; reads past the end run linearly into the next slot's memory (H4) | All range checks stay in the component (Slot enum, 480/48 line counts, EXPOSURE_MIN..MAX, REQ-031); `ErrorType.INVALID_PARAMETER` / `WRONG_MODE` kept for decoding (datasheet error types 2, 3) but no test can provoke them; L5-2 uses Memory Status instead of READ_REGISTER 0xFFFF |
-| Capture uptime per slot (Memory Status payload) | §7.4.3 | Not available (H1) | `ImageHeader` carries no uptime; `exposure` is the component's last pushed/read-back value |
-| Power-on banner (undocumented) | — (not in Rev 1.1) | 21 unframed ASCII bytes `4d 56 50 20 43 61 6d 65 72 61 20 56 32 20 52 53 34 32 32 0d 0a` = "MVP Camera V2 RS422\r\n" at camera power-on, then nothing; no firmware revision (H7, bench capture, camera power cycled by the human) | Treated as bytes outside a frame (REQ-020): skipped to the next 0x40, one `FrameDiscarded(MALFORMED, 21, "MVP Came…")`, `DiscardedBytes` += 21, no state change; unit test `testPowerOnBanner` with these exact bytes. No system test: reproducing it needs a camera power cycle, which only the human performs on request (bench rule: no hub power cycling) — recorded as a UT-only waiver in the plan. Identity: product family / interface variant only; firmware unidentifiable in-band |
+| Capture uptime per slot (Memory Status payload) | §7.4.3 | Not available: Memory Status not implemented (Rev 1.3, H1) | `ImageHeader` carries no uptime; `exposure` is the component's last pushed/read-back value |
+| Power-on banner (undocumented) | — (not in Rev 1.1, 1.2 or 1.3) | 21 unframed ASCII bytes `4d 56 50 20 43 61 6d 65 72 61 20 56 32 20 52 53 34 32 32 0d 0a` = "MVP Camera V2 RS422\r\n" at camera power-on, then nothing; no firmware revision (H7, bench capture, camera power cycled by the human) | Treated as bytes outside a frame (REQ-020): skipped to the next 0x40, one `FrameDiscarded(MALFORMED, 21, "MVP Came…")`, `DiscardedBytes` += 21, no state change; unit test `testPowerOnBanner` with these exact bytes. No system test: reproducing it needs a camera power cycle, which only the human performs on request (bench rule: no hub power cycling) — recorded as a UT-only waiver in the plan. Identity: product family / interface variant only; firmware unidentifiable in-band |
+| Zoom mode (mode 2, centre 640 × 480 crop) — PENDING probes-5 (phase C) | §6.2, §7.4.2 (Rev 1.2+) | Not probed as Zoom: the earlier "HD" probes sent mode byte 2, which Rev 1.3 defines as Zoom (H5 likely measured Zoom) | `Mode` gains ZOOM = 2 and HD becomes 3 if probes-5 confirms; disposition follows the measurement |
 
-Memory Status: keep or remove (human decision at the gate). Recommendation: KEEP as a standalone command. Reasons: it is the only
-camera error this unit can be made to produce (H4), so it is the system-test stimulus for REQ-019 / L5-2; it costs one command
-and two never-written channels; a datasheet-conformant unit would still be served. Consequences of REMOVE: `MEMORY_STATUS`,
-`MemoryStatusReply`, `MemorySlots`, `MemorySlot`, `Operation.MEMORY_STATUS` and `testMemoryStatusAndRegister`'s first half go;
-L5-2 loses its stimulus and REQ-019 becomes Unit Test + Inspection only on this bench.
+Memory Status: SETTLED — KEEP the standalone `MEMORY_STATUS` command. Rev 1.3 §7.4.3 documents it as planned, not implemented;
+on this unit it is the only reproducible camera error (H4) and the stimulus of REQ-019 / L5-2.
 
 HD four-slot assembly: option (a), the text of this design — DROP. One code path: the header `width`/`height`/`linesExpected`
 are 640/480/480 or 64/48/48 whatever the mode, `Mode.HD` is only a reply mode byte, no quadrant placement on the ground.
