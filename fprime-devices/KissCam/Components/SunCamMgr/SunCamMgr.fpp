@@ -73,7 +73,7 @@ module KissCam {
         # Parameters (SDD Table 1) — pushed by SETUP_CAMERA and, while READY, on change
         # ----------------------------------------------------------------------
 
-        @ Capture mode pushed with Set Mode (SD or HD; on our hardware both store one 640x480 slot, SDD §Not supported)
+        @ Capture mode pushed with Set Mode (SD or HD; both store one 640x480 slot on this unit, SDD §Hardware notes)
         param CAMERA_MODE: CaptureMode default CaptureMode.SD
 
         @ Exposure pushed with Set Exposure, in steps of 89.5 us, 2..960 (camera default 672)
@@ -93,16 +93,12 @@ module KissCam {
         @ Ping the camera; reply counters and uptime go to events and telemetry. Accepted when not set up
         async command PING(pingType: PingType) hook
 
-        @ Memory Status: mode, exposure and uptime of the image in each of the four slots (needs READY). Rev 1.3 §7.4.3:
-        @ not implemented — the camera answers CameraError(MEMORY_STATUS, UNRECOGNISED_COMMAND) — the only reproducible camera error
-        async command MEMORY_STATUS hook
-
-        @ Capture an image into a slot, optionally the test pattern (needs READY). The ACK carries 0 (Rev 1.3 §7.4.5 response
-        @ figure, bench) or 2 (§7.4.5 prose) exposure bytes; CaptureComplete echoes the slot argument and the reply mode
+        @ Capture an image into a slot, optionally the test pattern (needs READY). The ACK carries 0 (datasheet §7.4.5
+        @ response figure) or 2 (§7.4.5 prose) exposure bytes; CaptureComplete echoes the slot argument and the reply mode
         async command CAPTURE(slot: Slot, testPattern: TestPattern) hook
 
         @ Download the image in a slot into one Image data product (needs READY): 480 (FULL) or 48 (PREVIEW) line
-        @ requests in order, no Memory Status; the header mode is the first reply's mode byte
+        @ requests in order; the header mode is the first reply's mode byte
         async command DOWNLOAD(slot: Slot, resolution: Resolution) hook
 
         @ Stop the download in progress after the pending line; the lines received are still delivered (ACTIVITY_HI)
@@ -148,9 +144,6 @@ module KissCam {
         @ Ping reply
         event PingReply(pingType: PingType, validCmds: U8, invalidCmds: U8, uptime: U16) severity activity low \
             format "Camera ping {}: {} valid, {} invalid commands, uptime {} s"
-
-        @ Memory Status reply (Memory Status is not implemented, Rev 1.3 §7.4.3; never seen)
-        event MemoryStatusReply(slots: MemorySlots) severity activity low format "Camera memory slots: {}"
 
         @ Capture acknowledged; exposure = the ACK's exposure when it carries 2 bytes, else the last pushed or read-back exposure
         event CaptureComplete(slot: Slot, testPattern: TestPattern, exposure: U16, mode: Mode) severity activity high \
@@ -227,7 +220,7 @@ module KissCam {
         telemetry CurrentOperation: Operation
         @ Camera mode from the mode byte of the last reply
         telemetry CameraMode: Mode
-        @ EXPOSURE value the camera acknowledged, or the exposure of the last Capture reply (steps of 89.5 us; expected 0 after a test-pattern capture per datasheet §7.4.3, bench to confirm)
+        @ EXPOSURE value the camera acknowledged, or the exposure of the last Capture reply (steps of 89.5 us)
         telemetry Exposure: U16
         @ Sensor register 0x3012 from the last readback (steps of 89.5 us)
         telemetry ExposureReadback: U16
@@ -237,8 +230,6 @@ module KissCam {
         telemetry CameraValidCmds: U8
         @ Invalid commands counted by the camera since its boot (last Ping or error reply; rolls over at 256)
         telemetry CameraInvalidCmds: U8
-        @ Memory Status reply: mode, exposure and uptime of the image in each slot
-        telemetry MemorySlots: MemorySlots
         @ Last Read Register reply
         telemetry RegisterValue: RegisterValue
         @ Last camera error reply

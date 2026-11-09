@@ -1,9 +1,9 @@
 module KissCam {
-    @ Camera mode as the camera reports it in every reply (datasheet §6.2, §7.2; Rev 1.3 lists 0 Sleep, 1 SD, 2 Zoom, 3 HD — enum revision pending probes-5)
+    @ Camera mode as the camera reports it in every reply (datasheet §6.2, §7.2)
     enum Mode : U8 {
         SLEEP = 0 @< Image sensor held in reset
         SD = 1 @< Standard definition, 640 x 480 (preview 64 x 48), four slots
-        HD = 2 @< High definition per datasheet (1280 x 960 across four slots); on our hardware a single-slot 640 x 480 image tagged HD (SDD §Not supported)
+        HD = 2 @< High definition: on this unit a single-slot 640 x 480 (preview 64 x 48) image tagged HD (SDD §Hardware notes)
     }
     @ Capture modes the CAMERA_MODE parameter may select (Sleep is commanded with SLEEP)
     enum CaptureMode : U8 {
@@ -23,7 +23,7 @@ module KissCam {
     @ Download resolution (datasheet §7.4.6)
     enum Resolution : U8 {
         FULL = 0 @< 640 x 480, 480 lines of 640 pixels
-        PREVIEW = 1 @< 64 x 48, 48 lines of 64 pixels (bench; datasheet says 80 x 60)
+        PREVIEW = 1 @< 64 x 48, 48 lines of 64 pixels (SDD §Hardware notes)
     }
     @ Camera memory slot (datasheet §7.4.5)
     enum Slot : U8 {
@@ -91,13 +91,12 @@ module KissCam {
         SETUP_CAMERA = 0
         SLEEP = 1
         PING = 2
-        MEMORY_STATUS = 3
-        CAPTURE = 4
-        DOWNLOAD = 5
-        DOWNLOAD_ABORT = 6
-        READ_REGISTER = 7
-        PARAMETER_PUSH = 8
-        NONE = 9 @< No operation in progress (CurrentOperation channel only)
+        CAPTURE = 3
+        DOWNLOAD = 4
+        DOWNLOAD_ABORT = 5
+        READ_REGISTER = 6
+        PARAMETER_PUSH = 7
+        NONE = 8 @< No operation in progress (CurrentOperation channel only)
     }
     @ Queue inputs that can overflow (SDD REQ-029)
     enum QueueInput : U8 {
@@ -109,14 +108,6 @@ module KissCam {
     @ First bytes of a discarded frame, zero-padded (FrameDiscarded event)
     array FrameHead = [8] U8
 
-    @ One memory slot of the Memory Status reply (datasheet Rev 1.3 §7.4.3: planned, not currently implemented)
-    struct MemorySlot {
-        mode: Mode @< Camera mode when the image was taken
-        exposure: U16 @< Exposure of the image; 0 = test pattern
-        uptime: U16 @< Camera uptime (s) when the image was taken
-    }
-    @ The four memory slots, slot 1 first
-    array MemorySlots = [4] MemorySlot
     @ The last camera error reply (datasheet §7.4.9)
     struct CameraErrorInfo {
         cmdByte: U8 @< Command byte that caused the error
