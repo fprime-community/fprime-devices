@@ -81,7 +81,7 @@ Table 3 — Telemetry
 | SetupState | enum NOT_SETUP, SETTING_UP, READY | component state |
 | CurrentOperation | enum NONE, SETUP_CAMERA, SLEEP, PING, CAPTURE, DOWNLOAD, READ_REGISTER, PARAMETER_PUSH | component state (NONE when no operation is in progress) |
 | CameraMode | enum SLEEP = 0, SD = 1, ZOOM = 2, HD = 3 (the reply mode byte, §7.2) | mode byte of every reply |
-| Exposure | U16 | EXPOSURE value whose Set Exposure was acknowledged; Capture reply exposure |
+| Exposure | U16 | EXPOSURE value the camera acknowledged, or the exposure of the last Capture reply |
 | ExposureReadback | U16 | Read Register 0x3012 reply |
 | CameraUptime | U16 s | Ping reply |
 | RegisterValue | {address, value} | READ_REGISTER command reply |
@@ -101,7 +101,7 @@ Table 4 — Constants and data-product records
 | FULL_LINES, PREVIEW_LINES | 480, 48 | Download line requests per slot (`KissCam` constant; §Hardware notes); an HD image is 4 slots: 1920 / 192 |
 | FULL_PIXELS, PREVIEW_PIXELS | 640, 64 | pixel bytes per line reply (`KissCam` constant; §Hardware notes) |
 | POWER_ON_LINE | "MVP Camera V2 RS422\r\n" (21 bytes) | unframed line the camera emits at power-on (§Hardware notes); while READY its receipt means the camera restarted (REQ-034) |
-| ImageHeader record | slot, imageMode, resolution, width, height, exposure, linesExpected | first record of every image product, written when the first line reply arrives; `imageMode` = mode byte of that first reply (every later reply is checked against the commanded mode, REQ-021); `exposure` = the component's last pushed/read-back exposure (the camera reports none); `slot` = the commanded slot (SLOT_0 for HD); width × height = 640×480 (FULL) / 64×48 (PREVIEW), HD 1280×960 / 128×96; `linesExpected` = 480 / 48, HD 1920 / 192 |
+| ImageHeader record | slot, imageMode, resolution, width, height, exposure, linesExpected | first record of every image product, written when the first line reply arrives; `imageMode` = mode byte of that first reply (every later reply is checked against the commanded mode, REQ-021); `exposure` = the component's last pushed/read-back exposure (the camera reports none); `slot` = the commanded slot (SLOT_0 for HD); width × height = 640×480 (FULL) / 64×48 (PREVIEW), HD 1280×960 / 128×96; `linesExpected` = 480 / 48, HD 1920 / 192; a download that ends before its first line reply delivers the product with no records (the container has no release path other than send) |
 | ImageLine record | U8 array: slot (1 byte), line number (2 bytes, MSB first), then 640 or 64 pixels | one record per line received, camera byte order; in HD the slot tag places the line: slot s is the quadrant at x = 640·(s mod 2) (64 in PREVIEW), y = 480·(s div 2) (48) — 0 TL, 1 TR, 2 BL, 3 BR |
 
 ## Design
@@ -148,7 +148,7 @@ the doc-comment; data-product records are Table 4 (`ImageHeader` struct, `ImageL
 | DownloadStarted(slot, imageMode, resolution, lines) | ACTIVITY_LO | first line reply received: imageMode = its mode byte, ImageHeader record written (the product was allocated at the command) |
 | DownloadComplete(slot, imageMode, resolution, lines, bytes) | ACTIVITY_HI | last line stored, product sent; bytes = image bytes received (lines × 640 or × 64), not serialized record bytes |
 | DownloadAborted(slot, linesReceived) | ACTIVITY_HI | DOWNLOAD_ABORT ended the download; lines received delivered |
-| DownloadFailed(slot, linesReceived, cause) | WARNING_HI | download ended on a fault (LINE_FAILED, SEND_FAILED, PRODUCT_FULL); lines received delivered; a ModeMismatch during the line phase is reported as LINE_FAILED preceded by the ModeMismatch event |
+| DownloadFailed(slot, linesReceived, cause) | WARNING_HI | download ended on a fault (LINE_FAILED, SEND_FAILED, PRODUCT_FULL, CAMERA_RESTART); lines received delivered; a ModeMismatch during the line phase is reported as LINE_FAILED preceded by the ModeMismatch event |
 | LineRetry(line, attempt) | DIAGNOSTIC | a line is re-requested |
 | RegisterRead(address, value) | ACTIVITY_HI | Read Register acknowledged |
 | CommandRejected(operation, cause) | WARNING_LO | NOT_READY, BUSY, NO_DOWNLOAD, HD_SLOT; response EXECUTION_ERROR (BUSY for cause BUSY) |
@@ -192,7 +192,7 @@ response is deferred to the operation's end (durations and sequence timeouts: to
 is exempt from the mode check. Receive buffers with status OP_OK are appended to a component-local 648-byte assembler
 (rather than `Svc.FrameAccumulator`, whose `ComDataWithContext` ports would need an adapter and a second topology
 component), others are counted as discarded and returned when they carry data (a null notice has nothing to return), and a reply is complete when the length field (excluding the
-final 0x0D; image payloads may contain 0x0D) is satisfied. Bytes outside a frame, and a frame whose length field exceeds the assembler or whose last byte is not 0x0D, are skipped up to the next 0x40 or the end of the receive buffer and reported as one `FrameDiscarded(MALFORMED)` carrying their count and first 8 bytes; a reply left incomplete when its exchange times out is discarded `MALFORMED`; a Download reply whose payload is not the 2-byte line echo plus exactly the expected pixel count (640 full, 64 preview) is discarded `MALFORMED` and not stored, so the line fails by the reply timeout and is re-requested (REQ-SunCamMgr-016); and a fragment still in the assembler when the next exchange starts is discarded `NO_OPERATION`; a reply whose payload length, error type or mode byte cannot be decoded is discarded the same way and the exchange stays pending. The exact 21-byte POWER_ON_LINE (Table 4), recognised among the discarded bytes whether it arrives in one receive buffer or across several (the discard path matches it byte by byte), means the camera has restarted in Sleep: while READY or SETTING_UP the component emits `CameraRestarted(operation)` (WARNING_HI) and becomes NOT_SETUP, and the exchange in progress fails at once with cause CAMERA_RESTART — `SetupFailed(step, CAMERA_RESTART)` / `SettingPushFailed(setting, CAMERA_RESTART)`, a download ends with `DownloadFailed(slot, linesReceived, CAMERA_RESTART)` and the lines received are delivered, a Table 2 command answers EXECUTION_ERROR; while NOT_SETUP the line is REQ-020 noise only, counted and discarded. A complete reply is matched to the outstanding command byte and
+final 0x0D; image payloads may contain 0x0D) is satisfied. Bytes outside a frame, and a frame whose length field exceeds the assembler or whose last byte is not 0x0D, are skipped up to the next 0x40 or the end of the receive buffer and reported as one `FrameDiscarded(MALFORMED)` carrying their count and first 8 bytes, except that a run containing the POWER_ON_LINE is reported as the bytes before the line, the 21-byte line itself and any bytes after it as a further run; a reply left incomplete when its exchange times out is discarded `MALFORMED`; a Download reply whose payload is not the 2-byte line echo plus exactly the expected pixel count (640 full, 64 preview) is discarded `MALFORMED` and not stored, so the line fails by the reply timeout and is re-requested (REQ-SunCamMgr-016); and a fragment still in the assembler when the next exchange starts is discarded `NO_OPERATION`; a reply whose payload length, error type or mode byte cannot be decoded is discarded the same way and the exchange stays pending. The exact 21-byte POWER_ON_LINE (Table 4), recognised among the discarded bytes whether it arrives in one receive buffer or across several (the discard path matches it byte by byte), means the camera has restarted in Sleep: while READY or SETTING_UP the component emits `CameraRestarted(operation)` (WARNING_HI) and becomes NOT_SETUP, and the exchange in progress fails at once with cause CAMERA_RESTART — `SetupFailed(step, CAMERA_RESTART)` / `SettingPushFailed(setting, CAMERA_RESTART)`, a download ends with `DownloadFailed(slot, linesReceived, CAMERA_RESTART)` and the lines received are delivered, a Table 2 command answers EXECUTION_ERROR; while NOT_SETUP the line is REQ-020 noise only, counted and discarded. A complete reply is matched to the outstanding command byte and
 to every parameter it echoes (Download line number, Read Register address) — a mismatch, or a reply after its exchange
 timed out, is discarded (WRONG_COMMAND / NO_OPERATION; replies carry no sequence number, so a late reply to a re-sent
 command of the same byte and echo is indistinguishable) — then mode-checked (against the mode just set for a Set Mode reply, otherwise the commanded mode) and decoded into events and channels. The Capture ACK carries no payload (the §7.4.5 response figure): `CaptureComplete.exposure` is the
@@ -239,7 +239,7 @@ One `Image` container per downloaded image (DpContainer header, then the records
    SD/Zoom PREVIEW: 1 + 48 records, ≈ 4 KB (48 × (3 + 64) + record overhead + header)
    HD FULL: 1 + 1920 records, ≈ 1.26 MB; HD PREVIEW: 1 + 192 records, ≈ 15 KB (header width/height 1280×960 / 128×96)
 ```
-A product that ends early (abort or failure) holds the header and the lines received; `linesExpected` in the header and the
+A product that ends early (abort or failure) holds the header and the lines received, or no records when the download ended before its first line reply (the container has no release path other than send); `linesExpected` in the header and the
 record count tell the ground how much is missing. An HD product is assembled on the ground from the slot tags: slot 0 top-left, 1 top-right,
 2 bottom-left, 3 bottom-right, each 640 × 480 (64 × 48 in PREVIEW).
 
@@ -263,7 +263,7 @@ Out-of-scope failure modes
 | Failure | Owner |
 |---|---|
 | Camera power off / power cycling | the power-control component; operator re-runs SETUP_CAMERA |
-| Camera health while idle | operator PING (REQ-002: no autonomous frames); a power-cycle shows as ModeMismatch at the next exchange |
+| Camera health while idle | operator PING (REQ-002: no autonomous frames); a power-cycle is detected by the power-on line (REQ-034) |
 | Serial device missing, wrong baud, driver read errors | Drv.PosixUartDriver and the deployment |
 | Data-product storage, cataloguing and downlink | Svc.DpManager / DpWriter / DpCatalog |
 
