@@ -1,0 +1,22 @@
+register_fprime_module(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/SunCamMgr.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/SunCamMgr.cpp"
+    DEPENDS
+        Drv_ByteStreamDriverModel
+        Fw_Buffer
+        Svc_Ping
+        Svc_Sched
+        fprime-devices_KissCam_KissCamConfig
+        fprime-devices_KissCam_Types
+)
+
+register_fprime_ut(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/SunCamMgr.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/test/ut/SunCamMgrTestMain.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/test/ut/SunCamMgrTester.cpp"
+    UT_AUTO_HELPERS
+)
