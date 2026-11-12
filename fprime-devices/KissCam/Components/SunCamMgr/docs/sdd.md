@@ -251,10 +251,13 @@ sequenceDiagram
     participant D as DpManager
     G->>M: DOWNLOAD(slot, FULL)
     M->>D: productGetOut(Image, size for mode and resolution)
-    loop slot s = the commanded slot (SD, Zoom) or 0, 1, 2, 3 (HD); line = 0..479 (FULL) or 0..47 (PREVIEW) (retry ≤ LINE_RETRIES on timeout / error)
+    loop every slot and line (retry ≤ LINE_RETRIES on timeout / error)
+        Note over M,U: slot s = the commanded slot (SD, Zoom) or 0, 1, 2, 3 (HD), line = 0..479 (FULL) or 0..47 (PREVIEW)
         M->>U: drvSendOut "@D s 0 line"
         U-->>M: drvReceiveIn (several buffers) / run ticks
-        M->>M: assemble, check ACK/mode/line; first reply → serializeRecord_ImageHeader (imageMode = its mode byte) + DownloadStarted; serializeRecord_ImageLine, return buffers
+        M->>M: assemble, check ACK/mode/line
+        M->>M: first reply → serializeRecord_ImageHeader (imageMode = its mode byte) + DownloadStarted
+        M->>M: serializeRecord_ImageLine, return buffers
     end
     M->>D: productSendOut(Image)
     M-->>G: DownloadComplete, cmdResponse OK (DownloadAborted / DownloadFailed on an early end)
