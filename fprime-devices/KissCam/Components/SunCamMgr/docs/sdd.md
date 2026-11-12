@@ -1,6 +1,6 @@
-# KissCam::SunCamMgr
+# KissCam::SunCamMgr (Active Component)
 
-## Introduction
+## 1. Introduction
 
 `KissCam::SunCamMgr` is an active F Prime component that manages an MVP Aerospace KissCAM V2 sun camera over a UART
 byte-stream driver (115200 baud, 8N1, set by the deployment). It turns ground commands into the camera's seven-byte
@@ -10,16 +10,16 @@ readout as one F Prime data product (SD and Zoom: the one slot downloaded; HD: t
 one other command/reply exchange; at most one operation is in progress at a time. The camera is powered by another component, so the operator calls
 `SETUP_CAMERA` once it is on; until then the component is NOT_SETUP.
 
-Reference document: KissCAM V2 Datasheet and User Manual, Revision 1.3 (May 2025), as qualified by §Hardware notes. The camera
+Reference document: KissCAM V2 Datasheet and User Manual, Revision 1.3 (May 2025), as qualified by §7.1. The camera
 reports no firmware revision in-band; at power-on it emits one unframed ASCII line "MVP Camera V2 RS422\r\n" (21 bytes), which while
 READY is the camera-restart signal (REQ-034). The datasheet's Write Register command is not used. Memory Status is not
 implemented by the camera (§7.4.3) and is not commanded.
 
-## Requirements
+## 2. Requirements
 
 | ID | Requirement | Verification |
 |---|---|---|
-| REQ-SunCamMgr-001 | Frames sent and parsed shall comply with Datasheet Rev. 1.3 §7 as qualified by §Hardware notes. | Unit Test |
+| REQ-SunCamMgr-001 | Frames sent and parsed shall comply with Datasheet Rev. 1.3 §7 as qualified by §7.1. | Unit Test |
 | REQ-SunCamMgr-002 | Camera frames shall be sent only for a Table 2 command or Table 1 push. | Unit Test |
 | REQ-SunCamMgr-003 | `SETUP_CAMERA` shall run the Table 2 set-up exchanges in order, then become READY. | Unit Test |
 | REQ-SunCamMgr-004 | A failed set-up step shall return the component to NOT_SETUP with a WARNING_HI event. | Unit Test |
@@ -55,12 +55,151 @@ implemented by the camera (§7.4.3) and is not commanded.
 | REQ-SunCamMgr-035 | In HD, `CAPTURE` and `DOWNLOAD` shall be rejected with a WARNING_LO event unless slot is SLOT_0. | Unit Test |
 | REQ-SunCamMgr-036 | Capture shall be sent only while READY. | Unit Test |
 
-Table 1 — Parameters (persisted camera settings, pushed at set-up and on change)
+## 3. Design
 
-| Parameter | Type / range | Default | Camera command |
+### 3.1. Component Diagram
+
+```
+ drvConnected : Drv.ByteStreamReady ─▶┌─────────────────────────────┐─▶ drvSendOut : Drv.ByteStreamSend
+ drvReceiveIn : Drv.ByteStreamData  ─▶│     KissCam.SunCamMgr       │─▶ drvReceiveReturnOut : Fw.BufferSend
+ run : Svc.Sched                    ─▶│          (active)           │─▶ pingOut : Svc.Ping
+ pingIn : Svc.Ping                  ─▶└─────────────────────────────┘─▶ productGetOut, productSendOut (data products)
+```
+
+### 3.2. Ports
+
+| Port | Kind | Type | Purpose |
 |---|---|---|---|
-| CAMERA_MODE | enum SD = 1, ZOOM = 2, HD = 3 (the Set Mode byte, §7.4.2) | SD | Set Mode (`M`) |
-| EXPOSURE | U16, EXPOSURE_MIN..EXPOSURE_MAX (2..960) steps of 89.5 µs, checked by the component (§7.4.4) | 672 | Set Exposure (`E`) |
+| drvConnected | async input, `drop` | Drv.ByteStreamReady | driver ready; handler empty, no state kept |
+| drvReceiveIn | async input, `hook` | Drv.ByteStreamData | camera bytes, framed on the component thread |
+| drvReceiveReturnOut | output | Fw.BufferSend | return driver receive buffers |
+| drvSendOut | output | Drv.ByteStreamSend | send a 7-byte frame from the component's buffer |
+| run | sync input | Svc.Sched | rate-group tick; queues at most one `runInternal` |
+| runInternal | internal port, `hook` | — | the tick on the component thread: reply timeout, deferred parameter push, periodic channels |
+| pingIn / pingOut | async input `hook` / output | Svc.Ping | health ping |
+| productGetOut / productSendOut | product get / send | — | allocate and deliver the Image container |
+
+Hooks are used to report BUSY to the command dispatcher on queue overflow.
+
+### 3.3. State
+
+| State | Values | Meaning |
+|---|---|---|
+| `SetupState` (channel) | NOT_SETUP, SETTING_UP, READY | whether the camera has been set up by this component; only READY admits camera-touching Table 2 commands |
+| `CurrentOperation` (channel) | NONE or one Table 2 command / PARAMETER_PUSH | the single operation in progress; a Table 2 command is admitted only when NONE |
+| commanded mode | SLEEP, SD, ZOOM, HD | mode the camera was last told to be in; every reply's mode byte is checked against it while READY (SLEEP exempt) |
+| pending exchange | command byte, echoed parameters, ticks waiting | the one frame awaiting a reply; REPLY_TIMEOUT_TICKS bounds the wait |
+| dirty flags | CAMERA_MODE, EXPOSURE | Table 1 values changed since last pushed (set by `parameterUpdated`, cleared by the push) |
+| download bookkeeping | slot, resolution, lines per slot, lines received, attempt, abort requested, `DpContainer` | the `DOWNLOAD` in progress, see §4 |
+| counters | Table 3 component counters | written on change and every TLM_PERIOD_TICKS ticks |
+
+```mermaid
+stateDiagram-v2
+    [*] --> NOT_SETUP
+    NOT_SETUP --> SETTING_UP : SETUP_CAMERA
+    READY --> SETTING_UP : SETUP_CAMERA
+    SETTING_UP --> READY : Ping MCU, Set Mode, Set Exposure, Read 0x3012, Ping MCU+sensor all acknowledged (SetupComplete)
+    SETTING_UP --> NOT_SETUP : a step fails (SetupFailed)
+    READY --> NOT_SETUP : SLEEP acknowledged (SleepEntered)
+    READY --> NOT_SETUP : ModeMismatch, CameraRestarted, SettingPushFailed
+    note right of NOT_SETUP
+        SLEEP and PING are accepted here too.
+        CAPTURE, DOWNLOAD, READ_REGISTER are rejected NOT_READY.
+    end note
+    note right of READY
+        CAPTURE, DOWNLOAD (+ DOWNLOAD_ABORT), PING, READ_REGISTER
+        and Table 1 pushes run here, one operation at a time.
+    end note
+```
+
+### 3.4. Configuration and Setup
+
+`KissCamConfig` is a `register_fprime_config` module; a deployment overrides `KissCamConfig.fpp` through its config
+directory. The deployment drives `run` at 10 Hz (REPLY_TIMEOUT_TICKS × period = 2 s, datasheet §7) and opens the UART at
+115200 8N1; the operator sends `SETUP_CAMERA` once the camera is powered.
+
+```fpp
+constant REPLY_TIMEOUT_TICKS = 20   # run ticks per reply (2 s at 10 Hz)
+constant LINE_RETRIES = 3           # re-requests of one line before the download aborts
+constant IMAGE_DP_PRIORITY = 10     # default priority of the Image container
+constant TLM_PERIOD_TICKS = 10      # run ticks between periodic channel re-writes (1 s at 10 Hz)
+constant EXPOSURE_MIN = 2            # EXPOSURE range the component sends (datasheet §7.4.4)
+constant EXPOSURE_MAX = 960
+instance sunCamMgr: KissCam.SunCamMgr base id 0x... queue size 64 stack size 65536 priority 100
+```
+
+Table 4 — Constants and data-product records
+
+| Name | Value | Meaning |
+|---|---|---|
+| REPLY_TIMEOUT_TICKS | 20 (configurable) | `run` ticks allowed per camera reply (datasheet: 2000 ms) |
+| LINE_RETRIES | 3 (configurable) | re-requests of one image line before the download fails |
+| TLM_PERIOD_TICKS | 10 (configurable) | `run` ticks between periodic writes of the component state and counter channels (1 s at 10 Hz) |
+| EXPOSURE_MIN, EXPOSURE_MAX | 2, 960 | EXPOSURE values the component sends (datasheet §7.4.4) |
+| FULL_LINES, PREVIEW_LINES | 480, 48 | Download line requests per slot (`KissCam` constant; §7.1); an HD image is 4 slots: 1920 / 192 |
+| FULL_PIXELS, PREVIEW_PIXELS | 640, 64 | pixel bytes per line reply (`KissCam` constant; §7.1) |
+| POWER_ON_LINE | "MVP Camera V2 RS422\r\n" (21 bytes) | unframed line the camera emits at power-on (§7.1); while READY its receipt means the camera restarted (REQ-034) |
+| ImageHeader record | struct, §4 | first record of every image product, written when the first line reply arrives |
+| ImageLine record | U8 array, §4 | one record per line received |
+
+### 3.5. Port Handlers
+
+#### 3.5.1. Commands
+
+A Table 2 command is admitted only when no operation is in progress (else BUSY) and, for the READY-only commands, only while
+READY (else NOT_READY); every refusal is one `CommandRejected`. The accepted command sends its 7-byte frame on `drvSendOut` and
+its response is returned when the operation ends; `DOWNLOAD_ABORT` stops a running download after the pending line.
+
+#### 3.5.2. parameterUpdated
+
+Sets the dirty flag of the changed Table 1 parameter; `SETUP_CAMERA` applies both, and the tick pushes dirty ones while READY and
+idle. A CAMERA_MODE push is followed by an EXPOSURE push and readback because a mode change resets the sensor registers
+(REQ-027); EXPOSURE is range-checked locally before any frame is sent.
+
+#### 3.5.3. drvReceiveIn
+
+Assembles reply frames (0x40, length, payload, 0x0D) in a component-local buffer, returns the driver buffer, and matches the
+frame to the outstanding command byte and its echoed parameters. A matching reply is decoded into events and channels and
+advances the operation (next set-up step, next line, or command response); everything else is counted and discarded or ends the operation (§5.4).
+
+#### 3.5.4. run and runInternal
+
+`run` (rate-group thread) sets the atomic `m_runQueued` and queues at most one `runInternal` message. `runInternal` reports
+queue drops, counts the reply timeout, pushes dirty parameters and re-writes the state and counter channels every
+TLM_PERIOD_TICKS ticks.
+
+## 4. Data Product Format
+
+One `Image` container per downloaded image, allocated at the `DOWNLOAD` command and sent when the download completes, aborts
+or fails (the records received so far are delivered).
+
+| Container | Record id | Record | Type | Count |
+|---|---|---|---|---|
+| `Image` | 0 | `ImageHeader` | `KissCam.ImageHeader` struct | 1, written on the first line reply |
+| `Image` | 1 | `ImageLine` | `U8 array` | one per line received: 480 / 48 per slot (FULL / PREVIEW); HD 1920 / 192 |
+
+`ImageHeader` fields
+
+| Field | Type | Value |
+|---|---|---|
+| slot | `Slot` | commanded slot (SLOT_0 for an HD image) |
+| imageMode | `Mode` | mode byte of the first line reply |
+| resolution | `Resolution` | FULL or PREVIEW |
+| width, height | `U16` | 640 × 480 / 64 × 48; HD 1280 × 960 / 128 × 96 |
+| exposure | `U16` | the last pushed or read-back exposure (the camera reports none) |
+| linesExpected | `U16` | 480 / 48; HD 1920 / 192 |
+
+`ImageLine` layout
+
+| Bytes | Content |
+|---|---|
+| 0 | slot; in HD the quadrant: 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right |
+| 1–2 | line number, MSB first |
+| 3… | 640 (FULL) or 64 (PREVIEW) pixel bytes in camera order |
+
+## 5. Ground Interface
+
+### 5.1. Commands
 
 Table 2 — Commands (ground operations)
 
@@ -73,6 +212,17 @@ Table 2 — Commands (ground operations)
 | DOWNLOAD | slot: SLOT_0..SLOT_3 (SLOT_0 only in HD, REQ-035), resolution: FULL/PREVIEW | yes | Download × FULL_LINES / PREVIEW_LINES of the commanded slot; in HD of slots 0, 1, 2, 3 in order |
 | DOWNLOAD_ABORT | — | no (accepted only during a download) | none; the download stops after the pending line |
 | READ_REGISTER | address U16 | yes | Read Register |
+
+### 5.2. Parameters
+
+Table 1 — Parameters (persisted camera settings, pushed at set-up and on change)
+
+| Parameter | Type / range | Default | Camera command |
+|---|---|---|---|
+| CAMERA_MODE | enum SD = 1, ZOOM = 2, HD = 3 (the Set Mode byte, §7.4.2) | SD | Set Mode (`M`) |
+| EXPOSURE | U16, EXPOSURE_MIN..EXPOSURE_MAX (2..960) steps of 89.5 µs, checked by the component (§7.4.4) | 672 | Set Exposure (`E`) |
+
+### 5.3. Telemetry
 
 Table 3 — Telemetry
 
@@ -90,49 +240,8 @@ Table 3 — Telemetry
 | Exchanges, CameraErrors, Timeouts, DiscardedBytes, MalformedReplies | U32 | component counters |
 | ImagesCaptured, LinesDownloaded, ProductsSent, QueueOverflows | U32 | component counters |
 
-Table 4 — Constants and data-product records
+### 5.4. Events
 
-| Name | Value | Meaning |
-|---|---|---|
-| REPLY_TIMEOUT_TICKS | 20 (configurable) | `run` ticks allowed per camera reply (datasheet: 2000 ms) |
-| LINE_RETRIES | 3 (configurable) | re-requests of one image line before the download fails |
-| TLM_PERIOD_TICKS | 10 (configurable) | `run` ticks between periodic writes of the component state and counter channels (1 s at 10 Hz) |
-| EXPOSURE_MIN, EXPOSURE_MAX | 2, 960 | EXPOSURE values the component sends (datasheet §7.4.4) |
-| FULL_LINES, PREVIEW_LINES | 480, 48 | Download line requests per slot (`KissCam` constant; §Hardware notes); an HD image is 4 slots: 1920 / 192 |
-| FULL_PIXELS, PREVIEW_PIXELS | 640, 64 | pixel bytes per line reply (`KissCam` constant; §Hardware notes) |
-| POWER_ON_LINE | "MVP Camera V2 RS422\r\n" (21 bytes) | unframed line the camera emits at power-on (§Hardware notes); while READY its receipt means the camera restarted (REQ-034) |
-| ImageHeader record | slot, imageMode, resolution, width, height, exposure, linesExpected | first record of every image product, written when the first line reply arrives; `imageMode` = mode byte of that first reply (every later reply is checked against the commanded mode, REQ-021); `exposure` = the component's last pushed/read-back exposure (the camera reports none); `slot` = the commanded slot (SLOT_0 for HD); width × height = 640×480 (FULL) / 64×48 (PREVIEW), HD 1280×960 / 128×96; `linesExpected` = 480 / 48, HD 1920 / 192; a download that ends before its first line reply delivers the product with no records (the container has no release path other than send) |
-| ImageLine record | U8 array: slot (1 byte), line number (2 bytes, MSB first), then 640 or 64 pixels | one record per line received, camera byte order; in HD the slot tag places the line: slot s is the quadrant at x = 640·(s mod 2) (64 in PREVIEW), y = 480·(s div 2) (48) — 0 TL, 1 TR, 2 BL, 3 BR |
-
-## Design
-
-### Block diagram
-```
- drvConnected : Drv.ByteStreamReady ─▶┌─────────────────────────────┐─▶ drvSendOut : Drv.ByteStreamSend
- drvReceiveIn : Drv.ByteStreamData  ─▶│     KissCam.SunCamMgr       │─▶ drvReceiveReturnOut : Fw.BufferSend
- run : Svc.Sched                    ─▶│          (active)           │─▶ pingOut : Svc.Ping
- pingIn : Svc.Ping                  ─▶└─────────────────────────────┘─▶ productGetOut, productSendOut (data products)
-```
-### Ports
-| Port | Kind | Type | Purpose |
-|---|---|---|---|
-| drvConnected | async input, `drop` | Drv.ByteStreamReady | driver ready; handler empty, no state kept |
-| drvReceiveIn | async input, `hook` | Drv.ByteStreamData | camera bytes; async (not the sync `ByteStreamDriverClient` import) so framing runs on the component thread |
-| drvReceiveReturnOut | output | Fw.BufferSend | return driver receive buffers |
-| drvSendOut | output | Drv.ByteStreamSend | send a 7-byte frame from the component's buffer |
-| run | sync input | Svc.Sched | rate-group tick, caller's thread: test-and-set the atomic `m_runQueued`; when it was clear, invoke `runInternal` |
-| runInternal | internal port, `hook` | — | the tick on the component thread: reply timeouts, deferred parameter push, periodic channels; handler clears the atomic; the queue-full hook clears it and counts the drop (RUN_TICK) — at most one run message is ever queued |
-| pingIn / pingOut | async input `hook` / output | Svc.Ping | health ping |
-| productGetOut / productSendOut | product get / send | — | allocate and deliver the Image container |
-
-Special ports: cmdIn/cmdRegOut/cmdResponseOut, eventOut/textEventOut, tlmOut, timeGetOut, prmGetOut/prmSetOut. All Table 2
-commands (seven) are `async` with queue-full `hook`. Hooks run in the caller's thread and do only this: a command hook
-answers `cmdResponse BUSY`, the `drvReceiveIn` hook returns the buffer, the `runInternal` hook clears `m_runQueued`, and every hook increments its source's
-mutex-guarded drop count (one per `QueueInput`) — no other member is touched; on its next tick the component thread emits
-one `QueueOverflow(source, dropped)` per non-zero source and adds the sum to `QueueOverflows` (REQ-029). Parameters are Table 1; telemetry is Table 3, one channel per FPP row with units in
-the doc-comment; data-product records are Table 4 (`ImageHeader` struct, `ImageLine` `U8 array`, container `Image`).
-
-### Events
 | Event (args) | Severity | When |
 |---|---|---|
 | SetupStarted | ACTIVITY_LO | SETUP_CAMERA accepted |
@@ -161,87 +270,11 @@ the doc-comment; data-product records are Table 4 (`ImageHeader` struct, `ImageL
 | ProductAllocationFailed(bytes) | WARNING_HI | no Image container of the needed size |
 | QueueOverflow(source, dropped), throttle 10 | WARNING_HI | drops counted by the hooks since the last tick (COMMAND, UART_RECEIVE, RUN_TICK, HEALTH_PING) |
 
-### Configure
-`KissCamConfig` is a `register_fprime_config` module; a deployment overrides `KissCamConfig.fpp` through its config
-directory. `run` is driven at 10 Hz so that REPLY_TIMEOUT_TICKS × period = 2 s (datasheet §7); the tick-counted timeout expires between (REPLY_TIMEOUT_TICKS − 1) and REPLY_TIMEOUT_TICKS periods after the send (1.9–2.0 s at 10 Hz); a deployment with another
-rate re-sets the constant to keep ≈ 2 s. The deployment opens the UART at 115200 8N1 with 1024-byte receive buffers.
-```fpp
-constant REPLY_TIMEOUT_TICKS = 20   # run ticks per reply (2 s at 10 Hz)
-constant LINE_RETRIES = 3           # re-requests of one line before the download aborts
-constant IMAGE_DP_PRIORITY = 10     # default priority of the Image container
-constant TLM_PERIOD_TICKS = 10      # run ticks between periodic channel re-writes (1 s at 10 Hz)
-constant EXPOSURE_MIN = 2            # EXPOSURE range the component sends (datasheet §7.4.4)
-constant EXPOSURE_MAX = 960
-instance sunCamMgr: KissCam.SunCamMgr base id 0x... queue size 64 stack size 65536 priority 100
-```
-Image container size per image: `Header::SIZE + 2·hash + SIZE_OF_ImageHeader_RECORD + lines × SIZE_OF_ImageLine_RECORD
-(12 B record overhead with a 64-bit FwSizeType + 3 + pixels)` ≈ 315 KB SD/Zoom full (480 × 655 B), ≈ 4 KB preview (48 × 79 B); an HD image is four slots: ≈ 1.26 MB full
-(1920 × 655 B), ≈ 15 KB preview (192 × 79 B), so the data-product buffer manager needs a bin ≥ 1.3 MB for HD FULL and ≥ 320 KB for SD/Zoom FULL. Each queued receive
-holds one UART pool buffer, so while pool buffers are available UART_RECEIVE cannot by itself overflow a queue sized ≥ pool
-depth + pending command, tick and ping messages; the driver's 50 ms null-buffer notices after pool exhaustion, and any other
-overflow, fall back to: dropped buffers returned, reply fails as malformed, line retried. Pool depth and queue size are sized from
-the measured buffers-per-reply with 2× margin (values in the topology SDD), independent of task priorities (Linux honours them only
-with RT scheduling rights); download durations and sequence timeouts are deployment matters (topology SDD).
-REPLY_TIMEOUT_TICKS and LINE_RETRIES are compile-time by design: the timeout is the datasheet's fixed 2000 ms, LINE_RETRIES
-only bounds an abort the operator can re-command; both are deployment overrides, not flight parameters.
+## 6. Example Uses
 
-### Behavior
-A command is checked against Table 2 and `CurrentOperation`; a refusal emits `CommandRejected`, otherwise it becomes the
-operation in progress, its first 7-byte frame leaves on `drvSendOut` from the component's own buffer, and its command
-response is deferred to the operation's end (durations and sequence timeouts: topology SDD); SLEEP ends in NOT_SETUP either way and its reply
-is exempt from the mode check. Receive buffers with status OP_OK are appended to a component-local 648-byte assembler
-(rather than `Svc.FrameAccumulator`, whose `ComDataWithContext` ports would need an adapter and a second topology
-component), others are counted as discarded and returned when they carry data (a null notice has nothing to return), and a reply is complete when the length field (excluding the
-final 0x0D; image payloads may contain 0x0D) is satisfied. Bytes outside a frame, and a frame whose length field exceeds the assembler or whose last byte is not 0x0D, are skipped up to the next 0x40 or the end of the receive buffer and reported as one `FrameDiscarded(MALFORMED)` carrying their count and first 8 bytes, except that a run containing the POWER_ON_LINE is reported as the bytes before the line, the 21-byte line itself and any bytes after it as a further run; a reply left incomplete when its exchange times out is discarded `MALFORMED`; a Download reply whose payload is not the 2-byte line echo plus exactly the expected pixel count (640 full, 64 preview) is discarded `MALFORMED` and not stored, so the line fails by the reply timeout and is re-requested (REQ-SunCamMgr-016); and a fragment still in the assembler when the next exchange starts is discarded `NO_OPERATION`; a reply whose payload length, error type or mode byte cannot be decoded is discarded the same way and the exchange stays pending. The exact 21-byte POWER_ON_LINE (Table 4), recognised among the discarded bytes whether it arrives in one receive buffer or across several (the discard path matches it byte by byte), means the camera has restarted in Sleep: while READY or SETTING_UP the component emits `CameraRestarted(operation)` (WARNING_HI) and becomes NOT_SETUP, and the exchange in progress fails at once with cause CAMERA_RESTART — `SetupFailed(step, CAMERA_RESTART)` / `SettingPushFailed(setting, CAMERA_RESTART)`, a download ends with `DownloadFailed(slot, linesReceived, CAMERA_RESTART)` and the lines received are delivered, a Table 2 command answers EXECUTION_ERROR; while NOT_SETUP the line is REQ-020 noise only, counted and discarded. A complete reply is matched to the outstanding command byte and
-to every parameter it echoes (Download line number, Read Register address) — a mismatch, or a reply after its exchange
-timed out, is discarded (WRONG_COMMAND / NO_OPERATION; replies carry no sequence number, so a late reply to a re-sent
-command of the same byte and echo is indistinguishable) — then mode-checked (against the mode just set for a Set Mode reply, otherwise the commanded mode) and decoded into events and channels. The Capture ACK carries no payload (the §7.4.5 response figure): `CaptureComplete.exposure` is the
-`Exposure` channel value, the component's last pushed or read-back exposure; a Capture reply with any other payload length is discarded `MALFORMED`, so the
-exchange ends by `ReplyTimeout(CAPTURE, 0x43)` and the command answers EXECUTION_ERROR. Capture leaves the component only while READY (REQ-036): NOT_SETUP
-— before set-up, after SLEEP, after `CameraRestarted` — rejects it NOT_READY without a frame. `run`
-ticks count a per-exchange timeout; on expiry or a 0xFF reply the exchange fails and the operation ends per the
-requirements (set-up/push → NOT_SETUP; download line → `LineRetry`, then `DownloadFailed`), while a download allocates one
-product for the image at the command — SD/Zoom: the commanded slot, FULL_LINES / PREVIEW_LINES line requests; HD: slots 0, 1, 2, 3 in order, 4 × FULL_LINES / 4 × PREVIEW_LINES (the slot argument must be SLOT_0, REQ-035 — required rather than ignored so a wrong slot argument is reported, not silently accepted; the camera writes an HD image across all four slots and ignores the Capture slot) —
-writes the `ImageHeader` record and emits `DownloadStarted` when the first line reply arrives (its mode byte is `imageMode`; a later
-reply whose mode byte differs is a `ModeMismatch`, REQ-021; the component's last pushed/read-back exposure is `exposure`), adds one `ImageLine` record (slot, line, pixels) per reply and sends the product on completion,
-`DownloadAborted` (commanded, ACTIVITY_HI) or `DownloadFailed` (WARNING_HI). EXPOSURE is range-checked by the component:
-a value outside EXPOSURE_MIN..EXPOSURE_MAX is refused with one `SettingRejected` and no frame (the refusal clears the dirty
-flag, the next PRM_SET re-arms it; the applied value stands, READY is kept), and at set-up it fails the SET_EXPOSURE step
-locally — `SettingRejected(EXPOSURE, value, min, max)` then `SetupFailed(SET_EXPOSURE, OUT_OF_RANGE)`, NOT_SETUP — before Set
-Exposure is sent. DOWNLOAD answers OK on `DownloadComplete` and on a commanded `DownloadAborted` (the partial product was
-delivered), EXECUTION_ERROR on `DownloadFailed`; DOWNLOAD_ABORT answers OK once the download has stopped (also when it stopped on `DownloadFailed`), and a second DOWNLOAD_ABORT while one is pending is refused BUSY. `DownloadComplete.bytes` is the image bytes received: lines × FULL_PIXELS or × PREVIEW_PIXELS (3072 for a complete preview, 307200 for a full image; 12288 / 1228800 in HD) — the camera-determined quantity, not the serialized record bytes, which depend on `FwSizeType` and the header struct.
+### 6.1. Sequence Diagrams
 
-Tick path: `run` (sync, rate-group thread) test-and-sets the atomic `m_runQueued` and, when it was clear, invokes
-`runInternal`, whose handler and queue-full hook both clear it — the queue never holds more than one tick (the pattern of
-`Svc.EventManager`/`Svc.FileManager`). `parameterUpdated` only sets a mutex-guarded dirty flag, one per Table 1 parameter; `SETUP_CAMERA` applies the stored CAMERA_MODE and EXPOSURE and clears both
-flags (a parameter changed while NOT_SETUP is never pushed on its own); the `runInternal` handler pushes the dirty parameters while idle (`CAMERA_MODE` then `EXPOSURE` + readback — every CAMERA_MODE push is followed by an EXPOSURE push and readback, REQ-027, because a mode change resets the sensor registers, exposure included, to their defaults, §6.2/§7.4.2; an EXPOSURE-only change pushes `EXPOSURE` + readback), and on its first tick
-the component reports SetupState NOT_SETUP, CurrentOperation NONE and zero counters and re-writes the component state and counter channels (SetupState, CurrentOperation, nine U32 counters) every `TLM_PERIOD_TICKS` ticks (1 Hz at the 10 Hz rate) as well as on change; camera-sourced channels are written on reply only. Replies are parsed by length within the 648-byte assembler; the exposure readback is compared with the value sent.
-
-### Data product
-One `Image` container per downloaded image (DpContainer header, then the records; SD/Zoom: one slot, HD: slots 0..3 in order):
-```
- ┌──────────────────────────────┬──────────────────────────────────────────────────┬────────────┐
- │ Fw::DpContainer::Header      │ records                                          │ data hash  │
- │ id, priority, time, procTypes│ ┌──────────────────────────────────────────────┐ │            │
- │ userData, dpState, dataSize  │ │ record id 0  ImageHeader (serialized struct) │ │            │
- │ header hash                  │ │  slot │imageMode│resolution│width│height│…   │ │            │
- │                              │ ├──────────────────────────────────────────────┤ │            │
- │                              │ │ record id 1  ImageLine  U8 array, size + data│ │            │
- │                              │ │  [slot][line MSB][line LSB][pixel 0 … N-1]   │ │            │
- │                              │ │   N = 640 (FULL) or 64 (PREVIEW)             │ │            │
- │                              │ ├──────────────────────────────────────────────┤ │            │
- │                              │ │  … one ImageLine per line received, in the   │ │            │
- │                              │ │  order requested: slot s lines 0..479 (FULL) │ │            │
- │                              │ │  or 0..47 (PREVIEW); HD: slots 0,1,2,3 each  │ │            │
- │                              │ └──────────────────────────────────────────────┘ │            │
- └──────────────────────────────┴──────────────────────────────────────────────────┴────────────┘
-   SD/Zoom FULL: 1 + 480 records, ≈ 315 KB (480 × (3 + 640) px/prefix bytes + record overhead + header)
-   SD/Zoom PREVIEW: 1 + 48 records, ≈ 4 KB (48 × (3 + 64) + record overhead + header)
-   HD FULL: 1 + 1920 records, ≈ 1.26 MB; HD PREVIEW: 1 + 192 records, ≈ 15 KB (header width/height 1280×960 / 128×96)
-```
-A product that ends early (abort or failure) holds the header and the lines received, or no records when the download ended before its first line reply (the container has no release path other than send); `linesExpected` in the header and the
-record count tell the ground how much is missing. An HD product is assembled on the ground from the slot tags: slot 0 top-left, 1 top-right,
-2 bottom-left, 3 bottom-right, each 640 × 480 (64 × 48 in PREVIEW).
+The `DOWNLOAD` operation, from the command to the delivered `Image` product:
 
 ```mermaid
 sequenceDiagram
@@ -262,7 +295,24 @@ sequenceDiagram
     M->>D: productSendOut(Image)
     M-->>G: DownloadComplete, cmdResponse OK (DownloadAborted / DownloadFailed on an early end)
 ```
-Out-of-scope failure modes
+
+## 7. Idiosyncrasies
+
+### 7.1. Camera
+
+Where the camera unit differs from Datasheet Rev 1.3; the component follows the unit.
+
+| Item | Documented (Rev 1.3) | Observed | Design |
+|---|---|---|---|
+| Preview image | 80 × 60, 60 lines (§7.4.6) | 64 × 48: line = 2-byte echo + 64 pixels (LEN 0x0042), 48 lines; a line ≥ 48 returns the next region | PREVIEW = 64 × 48 throughout |
+| Memory slot index | Capture 0–3, Download 1–4 (§7.4.5, §7.4.6) | 0–3 in both frames; index 4 writes a fifth view that aliases slot 1 | `Slot` = SLOT_0..SLOT_3 |
+| Capture in Sleep | needs SD, Zoom or HD (§7.4.2) | a live Capture in Sleep can hang the camera until a power cycle | Capture is sent only while READY (REQ-036) |
+| Parameter validation | error types 2 and 3 (§7.4.9) | out-of-range slot, line, exposure and address are answered with normal frames; a read past an image runs into the next slot | every range check is the component's (REQ-031) |
+| Power-on line | undocumented | 21 unframed bytes "MVP Camera V2 RS422\r\n" at power-on, camera then in Sleep | READY: `CameraRestarted`, NOT_SETUP (REQ-034); NOT_SETUP: discarded (REQ-020) |
+| Memory Status `S` | listed (§7.3), "not implemented" (§7.4.3) | answers error type 1 | not commanded; the operator tracks captures |
+
+### 7.2. Out of scope
+
 | Failure | Owner |
 |---|---|
 | Camera power off / power cycling | the power-control component; operator re-runs SETUP_CAMERA |
@@ -270,26 +320,14 @@ Out-of-scope failure modes
 | Serial device missing, wrong baud, driver read errors | Drv.PosixUartDriver and the deployment |
 | Data-product storage, cataloguing and downlink | Svc.DpManager / DpWriter / DpCatalog |
 
-
-### Hardware notes
-Facts about the camera unit this component is built for, where they differ from or add to Datasheet Rev 1.3. The component
-follows the unit.
-
-| Item | Datasheet Rev 1.3 | This unit | Design |
-|---|---|---|---|
-| Preview image | 80 × 60, 60 lines (§7.4.6) | 64 × 48: preview line = 2-byte line echo + 64 pixel bytes (LEN 0x0042), 48 lines; a line request ≥ 48 is answered with sensor data of the next region, not an error | PREVIEW = 64 × 48 throughout: `Resolution.PREVIEW`, PREVIEW_LINES / PREVIEW_PIXELS, `ImageHeader`, product sizes |
-| Memory slot index | Capture table 0–3; Download table 1–4 (§7.4.5, §7.4.6) | 0–3 in both frames; index 4 is answered normally but writes a fifth view that aliases slot 1 | `Slot` = SLOT_0..SLOT_3; the component never emits 4 |
-| Capture in Sleep | capture needs SD, Zoom or HD (§7.4.2) | a live Capture sent in Sleep can hang the camera until a power cycle (a test-pattern Capture is acknowledged) | Capture leaves the component only while READY, i.e. after Set Mode SD/Zoom/HD was acknowledged (Table 2) |
-| Camera-side parameter validation | error types 2 (invalid parameter) and 3 (wrong mode), §7.4.9 | Download slot 4 / 5 / line ≥ 480, Set Exposure 0, Capture slot 4, Read Register 0xFFFF, Download in Sleep are answered with normal frames; a read past an image runs linearly into the next slot's memory | every range check is the component's: `Slot` enum, FULL_LINES / PREVIEW_LINES line counts, EXPOSURE_MIN..EXPOSURE_MAX (REQ-031); `ErrorType` keeps every datasheet code for decoding |
-| Power-on line | — (undocumented) | 21 unframed ASCII bytes `4d 56 50 20 43 61 6d 65 72 61 20 56 32 20 52 53 34 32 32 0d 0a` = "MVP Camera V2 RS422\r\n" at camera power-on; the camera is then in Sleep; no firmware revision is reported in-band | POWER_ON_LINE (Table 4): while NOT_SETUP bytes outside a frame (REQ-020: `FrameDiscarded(MALFORMED, 21, head "MVP Came")`, DiscardedBytes += 21); while READY the only in-band restart signal → `CameraRestarted`, NOT_SETUP (REQ-034) |
-| Memory Status | §7.3 lists `S` (0x54); §7.4.3 "not currently implemented" | `S` (0x53 and 0x54) answers error type 1, unrecognised command | not commanded; slot contents are not readable — an empty slot or a mixed HD set downloads as whatever memory holds; the operator tracks captures (CaptureComplete, ImagesCaptured) |
-
-## Tests
+## 8. Tests
 
 System tests run on the `SunCamRef` deployment (fprime-devices-reference) on the Raspberry Pi 5 bench against the KissCAM V2
 bench unit; the plan (`SunCamRef/test/int/plan.json`) is the source of this table. The camera-side fault paths the bench
 cannot force (timeouts, failed set-up, send/allocation failure, queue full, stray bytes, camera error replies, mode mismatch, camera restart) are unit tests.
 L8-1 needs the human to power-cycle the camera: it runs in the run-for-record only and is deferred in rehearsal and dry runs.
+
+### 8.1. System Tests
 
 <!-- fth:tests:begin -->
 _Generated by `fth render-sdd-tests` from the plan — do not edit by hand; the package renderer fails when this table and the plan disagree._
@@ -315,9 +353,8 @@ _Generated by `fth render-sdd-tests` from the plan — do not edit by hand; the 
 | L6-2 | Negative control: DOWNLOAD_ABORT with no download | REQ-SunCamMgr-026 |
 | L7-1 | Final state: test-pattern capture, preview product on disk | REQ-SunCamMgr-001, REQ-SunCamMgr-013, REQ-SunCamMgr-015 |
 | L8-1 | Camera power-on (human step; run-for-record only, DEFERRED in rehearsal and dry runs) → set-up | REQ-SunCamMgr-003, REQ-SunCamMgr-020, REQ-SunCamMgr-034, REQ-SunCamMgr-036 |
-<!-- fth:tests:end -->
 
-### Unit-test list
+### 8.2. Unit Tests
 
 | Test | Description | Requirements |
 |---|---|---|
