@@ -15,15 +15,6 @@ reports no firmware revision in-band; at power-on it emits one unframed ASCII li
 READY is the camera-restart signal (REQ-034). The datasheet's Write Register command is not used. Memory Status is not
 implemented by the camera (§7.4.3) and is not commanded.
 
-Out of scope (owned elsewhere):
-
-| Failure | Owner |
-|---|---|
-| Camera power off / power cycling | the power-control component; operator re-runs SETUP_CAMERA |
-| Camera health while idle | operator PING (REQ-002: no autonomous frames); a power-cycle is detected by the power-on line (REQ-034) |
-| Serial device missing, wrong baud, driver read errors | Drv.PosixUartDriver and the deployment |
-| Data-product storage, cataloguing and downlink | Svc.DpManager / DpWriter / DpCatalog |
-
 ## 2. Requirements
 
 | ID | Requirement | Verification |
@@ -169,7 +160,7 @@ idle. A CAMERA_MODE push is followed by an EXPOSURE push and readback because a 
 
 Assembles reply frames (0x40, length, payload, 0x0D) in a component-local buffer, returns the driver buffer, and matches the
 frame to the outstanding command byte and its echoed parameters. A matching reply is decoded into events and channels and
-advances the operation (next set-up step, next line, or command response); everything else is handled per §7.2.
+advances the operation (next set-up step, next line, or command response); everything else is counted and discarded or ends the operation (§5.4).
 
 #### 3.5.4. run and runInternal
 
@@ -281,24 +272,7 @@ Table 3 — Telemetry
 
 ## 6. Example Uses
 
-### 6.1. Topology Diagrams
-
-A deployment connects one `SunCamMgr` instance to a byte-stream UART driver, a rate group, the data-product manager and
-health; `SunCamRef` (fprime-devices-reference) is the reference topology.
-
-```mermaid
-flowchart LR
-    RG["rateGroup (10 Hz)"] -->|"run"| M["sunCamMgr"]
-    M -->|"drvSendOut"| U["uartDriver (Drv.ByteStreamDriver, 115200 8N1)"]
-    U -->|"drvReceiveIn"| M
-    M -->|"drvReceiveReturnOut"| U
-    U -->|"drvConnected"| M
-    M -->|"productGetOut / productSendOut"| DP["dpManager"]
-    H["health"] -->|"pingIn"| M
-    M -->|"pingOut"| H
-```
-
-### 6.2. Sequence Diagrams
+### 6.1. Sequence Diagrams
 
 The `DOWNLOAD` operation, from the command to the delivered `Image` product:
 
@@ -337,17 +311,14 @@ Where the camera unit differs from Datasheet Rev 1.3; the component follows the 
 | Power-on line | undocumented | 21 unframed bytes "MVP Camera V2 RS422\r\n" at power-on, camera then in Sleep | READY: `CameraRestarted`, NOT_SETUP (REQ-034); NOT_SETUP: discarded (REQ-020) |
 | Memory Status `S` | listed (§7.3), "not implemented" (§7.4.3) | answers error type 1 | not commanded; the operator tracks captures |
 
-### 7.2. Error handling
+### 7.2. Out of scope
 
-- A camera error reply (0xFF), a reply timeout (REPLY_TIMEOUT_TICKS) or a refused send ends the operation: set-up →
-  `SetupFailed`, NOT_SETUP; Table 1 push → `SettingPushFailed`, NOT_SETUP; download line → `LineRetry` up to LINE_RETRIES,
-  then `DownloadFailed`; other commands → EXECUTION_ERROR.
-- A reply mode ≠ commanded mode (while READY, SLEEP exempt), an exposure readback ≠ pushed value, or the power-on line →
-  NOT_SETUP (`ModeMismatch`, `ExposureReadback`, `CameraRestarted`).
-- A download that ends early still sends the product with the lines received; a record that no longer fits is
-  `DownloadFailed(PRODUCT_FULL)`; a failed container allocation rejects the command before any frame is sent.
-- Bytes outside a frame and malformed, out-of-operation or wrong-command frames are counted and discarded (`FrameDiscarded`).
-  Replies carry no sequence number, so a late reply to a re-sent frame is indistinguishable from the real one.
+| Failure | Owner |
+|---|---|
+| Camera power off / power cycling | the power-control component; operator re-runs SETUP_CAMERA |
+| Camera health while idle | operator PING (REQ-002: no autonomous frames); a power-cycle is detected by the power-on line (REQ-034) |
+| Serial device missing, wrong baud, driver read errors | Drv.PosixUartDriver and the deployment |
+| Data-product storage, cataloguing and downlink | Svc.DpManager / DpWriter / DpCatalog |
 
 ## 8. Tests
 
