@@ -177,10 +177,11 @@ or fails (the records received so far are delivered). The product priority is se
 argument (1..2^32−1; lower is sent first by `Svc.DpCatalog`), or `KissCamConfig.IMAGE_DP_PRIORITY` when it is 0 — priority 0 is
 not commandable through `DOWNLOAD`.
 
-| Container | Record id | Record | Type | Count |
+| Data product | Kind | Id | Type | Count |
 |---|---|---|---|---|
-| `Image` | 0 | `ImageHeader` | `KissCam.ImageHeader` struct | 1, written on the first line reply |
-| `Image` | 1 | `ImageLine` | `U8 array` | one per line received: 480 / 48 per slot (FULL / PREVIEW); HD 1920 / 192 |
+| `Image` | container | 0 | records below | one per downloaded image |
+| `ImageHeader` | record | 0 | `KissCam.ImageHeader` struct | 1, written on the first line reply |
+| `ImageLine` | record | 1 | `U8 array` | one per line received: 480 / 48 per slot (FULL / PREVIEW); HD 1920 / 192 |
 
 `ImageHeader` fields
 
@@ -221,7 +222,7 @@ Table 2 — Commands (ground operations)
 
 Table 1 — Parameters (persisted camera settings, pushed at set-up and on change)
 
-| Parameter | Type / range | Default | Camera command |
+| Parameter | Type / range | Default | Pushed by |
 |---|---|---|---|
 | CAMERA_MODE | enum SD = 1, ZOOM = 2, HD = 3 (the Set Mode byte, §7.4.2) | SD | Set Mode (`M`) |
 | EXPOSURE | U16, EXPOSURE_MIN..EXPOSURE_MAX (2..960) steps of 89.5 µs, checked by the component (§7.4.4) | 672 | Set Exposure (`E`) |
@@ -267,12 +268,12 @@ Table 3 — Telemetry
 | CommandRejected(operation, cause) | WARNING_LO | NOT_READY, BUSY, NO_DOWNLOAD, HD_SLOT; response EXECUTION_ERROR (BUSY for cause BUSY) |
 | CameraError(operation, cmdByte, errorType, count) | WARNING_HI | 0xFF reply |
 | ReplyTimeout(operation, cmdByte) | WARNING_HI | REPLY_TIMEOUT_TICKS elapsed |
-| FrameDiscarded(cause, bytes, head), throttle 10 | WARNING_LO | NO_OPERATION, MALFORMED, WRONG_COMMAND; first 8 bytes kept |
+| FrameDiscarded(cause, bytes, head) | WARNING_LO | NO_OPERATION, MALFORMED, WRONG_COMMAND; first 8 bytes kept; throttle 10 |
 | ModeMismatch(commanded, reported) | WARNING_HI | reply mode ≠ commanded while READY; NOT_SETUP |
 | CameraRestarted(operation) | WARNING_HI | the POWER_ON_LINE arrived while READY or SETTING_UP (operation = the one in progress, NONE when idle); NOT_SETUP |
 | SendFailed(operation, status) | WARNING_HI | driver refused the frame |
 | ProductAllocationFailed(bytes) | WARNING_HI | no Image container of the needed size |
-| QueueOverflow(source, dropped), throttle 10 | WARNING_HI | drops counted by the hooks since the last tick (COMMAND, UART_RECEIVE, RUN_TICK, HEALTH_PING) |
+| QueueOverflow(source, dropped) | WARNING_HI | drops counted by the hooks since the last tick (COMMAND, UART_RECEIVE, RUN_TICK, HEALTH_PING); throttle 10 |
 
 ## 6. Example Uses
 
