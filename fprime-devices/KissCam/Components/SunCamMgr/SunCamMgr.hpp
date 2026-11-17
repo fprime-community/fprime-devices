@@ -36,6 +36,16 @@ class SunCamMgr final : public SunCamMgrComponentBase {
     static constexpr FwSizeType REPLY_MAX_SIZE = 648;    //!< header + 642-byte payload + 0x0D
     static constexpr FwSizeType REPLY_MAX_PAYLOAD = REPLY_MAX_SIZE - REPLY_HEADER_SIZE - 1;
     static constexpr FwSizeType FRAME_HEAD_SIZE = 8;  //!< bytes kept in FrameDiscarded
+    //! Byte offsets within a command frame
+    enum CommandFrameOffset : FwSizeType {
+        FRAME_START_OFFSET = 0,
+        FRAME_CMD_OFFSET = 1,
+        FRAME_P1_OFFSET = 2,
+        FRAME_P2_OFFSET = 3,
+        FRAME_P3_OFFSET = 4,
+        FRAME_P4_OFFSET = 5,
+        FRAME_END_OFFSET = 6
+    };
 
     static constexpr U16 EXPOSURE_REGISTER = 0x3012;          //!< sensor register read back after an exposure push
     static constexpr U16 FULL_PIXELS = KissCam::FULL_PIXELS;  //!< pixels per full-resolution line (SDD Table 4)
