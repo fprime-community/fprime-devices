@@ -49,7 +49,9 @@ SunCamMgrTester::SunCamMgrTester()
     this->component.loadParameters();
 }
 
-SunCamMgrTester::~SunCamMgrTester() {}
+SunCamMgrTester::~SunCamMgrTester() {
+    this->component.deinit();
+}
 
 // ----------------------------------------------------------------------
 // Handlers for typed from ports

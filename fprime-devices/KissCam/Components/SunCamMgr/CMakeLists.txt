@@ -6,6 +6,7 @@ register_fprime_module(
     DEPENDS
         Drv_ByteStreamDriverModel
         Fw_Buffer
+        Os
         Svc_Ping
         Svc_Sched
         fprime-devices_KissCam_KissCamConfig
@@ -18,5 +19,7 @@ register_fprime_ut(
     SOURCES
         "${CMAKE_CURRENT_LIST_DIR}/test/ut/SunCamMgrTestMain.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/test/ut/SunCamMgrTester.cpp"
+    DEPENDS
+        Fw_Dp
     UT_AUTO_HELPERS
 )

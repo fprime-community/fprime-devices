@@ -112,12 +112,12 @@ SunCamMgr::SunCamMgr(const char* const compName)
       m_linesDownloaded(0),
       m_productsSent(0),
       m_queueOverflows(0) {
-    ::memset(this->m_pendingParams, 0, sizeof this->m_pendingParams);
-    ::memset(this->m_lineRecord, 0, sizeof this->m_lineRecord);
-    ::memset(this->m_txFrame, 0, sizeof this->m_txFrame);
-    ::memset(this->m_rx, 0, sizeof this->m_rx);
-    ::memset(this->m_strayHead, 0, sizeof this->m_strayHead);
-    ::memset(this->m_drops, 0, sizeof this->m_drops);
+    (void)::memset(this->m_pendingParams, 0, sizeof this->m_pendingParams);
+    (void)::memset(this->m_lineRecord, 0, sizeof this->m_lineRecord);
+    (void)::memset(this->m_txFrame, 0, sizeof this->m_txFrame);
+    (void)::memset(this->m_rx, 0, sizeof this->m_rx);
+    (void)::memset(this->m_strayHead, 0, sizeof this->m_strayHead);
+    (void)::memset(this->m_drops, 0, sizeof this->m_drops);
 }
 
 SunCamMgr::~SunCamMgr() {}
@@ -297,8 +297,8 @@ void SunCamMgr::runInternal_internalInterfaceHandler() {
     U32 drops[QueueInput::NUM_CONSTANTS] = {};
     {
         Os::ScopeLock lock(this->m_lock);
-        ::memcpy(drops, this->m_drops, sizeof drops);
-        ::memset(this->m_drops, 0, sizeof this->m_drops);
+        (void)::memcpy(drops, this->m_drops, sizeof drops);
+        (void)::memset(this->m_drops, 0, sizeof this->m_drops);
     }
     U32 dropped = 0;
     for (FwSizeType i = 0; i < QueueInput::NUM_CONSTANTS; i++) {
@@ -480,13 +480,13 @@ bool SunCamMgr::sendFrame(U8 cmd, U8 p1, U8 p2, U8 p3, U8 p4) {
     FW_ASSERT(this->m_pendingCmd == 0, this->m_pendingCmd);
     // a fragment received while no exchange was pending can only be noise or a late reply
     this->discardPartialFrame(DiscardCause::NO_OPERATION);
-    this->m_txFrame[0] = FRAME_START;
-    this->m_txFrame[1] = cmd;
-    this->m_txFrame[2] = p1;
-    this->m_txFrame[3] = p2;
-    this->m_txFrame[4] = p3;
-    this->m_txFrame[5] = p4;
-    this->m_txFrame[6] = FRAME_END;
+    this->m_txFrame[FRAME_START_OFFSET] = FRAME_START;
+    this->m_txFrame[FRAME_CMD_OFFSET] = cmd;
+    this->m_txFrame[FRAME_P1_OFFSET] = p1;
+    this->m_txFrame[FRAME_P2_OFFSET] = p2;
+    this->m_txFrame[FRAME_P3_OFFSET] = p3;
+    this->m_txFrame[FRAME_P4_OFFSET] = p4;
+    this->m_txFrame[FRAME_END_OFFSET] = FRAME_END;
     Fw::Buffer frame(this->m_txFrame, COMMAND_FRAME_SIZE);
     const Drv::ByteStreamStatus status = this->drvSendOut_out(0, frame);
     if (status != Drv::ByteStreamStatus::OP_OK) {
@@ -538,6 +538,7 @@ void SunCamMgr::exchangeFailed(FailCause::T cause) {
                 this->failDownload(DownloadFailCause::LINE_FAILED);
             } else {
                 this->m_lineAttempt++;
+                FW_ASSERT(this->m_linesPerSlot > 0);
                 this->log_DIAGNOSTIC_LineRetry(static_cast<U16>(this->m_linesReceived % this->m_linesPerSlot),
                                                this->m_lineAttempt);
                 this->requestLine();
@@ -617,10 +618,11 @@ void SunCamMgr::discardStrayBefore(FwSizeType keep) {
                       static_cast<U32>(before));
     }
     this->m_strayCount = static_cast<U32>(keep);
-    ::memcpy(this->m_strayHead, POWER_ON_LINE, FW_MIN(keep, FRAME_HEAD_SIZE));
+    (void)::memcpy(this->m_strayHead, POWER_ON_LINE, FW_MIN(keep, FRAME_HEAD_SIZE));
 }
 
 void SunCamMgr::strayByte(U8 byte) {
+    FW_ASSERT(this->m_powerOnMatch < POWER_ON_LINE_SIZE, static_cast<FwAssertArgType>(this->m_powerOnMatch));
     if (this->m_strayCount < FRAME_HEAD_SIZE) {
         this->m_strayHead[this->m_strayCount] = byte;
     }
@@ -671,7 +673,7 @@ void SunCamMgr::discardPartialFrame(DiscardCause::T cause) {
 void SunCamMgr::discard(DiscardCause::T cause, const U8* bytes, FwSizeType headSize, U32 totalBytes) {
     FW_ASSERT(headSize <= FRAME_HEAD_SIZE, static_cast<FwAssertArgType>(headSize));
     U8 headBytes[FRAME_HEAD_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0};
-    ::memcpy(headBytes, bytes, headSize);
+    (void)::memcpy(headBytes, bytes, headSize);
     this->m_discardedBytes += totalBytes;
     this->tlmWrite_DiscardedBytes(this->m_discardedBytes);
     if (cause == DiscardCause::MALFORMED) {
@@ -682,6 +684,7 @@ void SunCamMgr::discard(DiscardCause::T cause, const U8* bytes, FwSizeType headS
 }
 
 void SunCamMgr::processReply(const U8* frame, FwSizeType size) {
+    FW_ASSERT(frame != nullptr);
     FW_ASSERT(size >= REPLY_HEADER_SIZE + 1, static_cast<FwAssertArgType>(size));
     const U8 ack = frame[1];
     const U8 modeByte = frame[2];
@@ -767,6 +770,7 @@ void SunCamMgr::processReply(const U8* frame, FwSizeType size) {
 }
 
 void SunCamMgr::handleReply(Mode::T reported, const U8* payload, U16 length) {
+    FW_ASSERT(payload != nullptr);
     switch (this->m_txFrame[1]) {
         case CMD_PING: {
             const U8 validCmds = payload[0];
@@ -952,13 +956,14 @@ void SunCamMgr::requestLine() {
 }
 
 void SunCamMgr::storeLine(const U8* payload, U16 length) {
+    FW_ASSERT(payload != nullptr);
     FW_ASSERT(length >= 2, length);
     const FwSizeType pixels = static_cast<FwSizeType>(length) - 2;
     FW_ASSERT(LINE_RECORD_PREFIX + pixels <= sizeof this->m_lineRecord, static_cast<FwAssertArgType>(pixels));
     this->m_lineRecord[0] = this->m_pendingParams[0];  // slot as requested
     this->m_lineRecord[1] = payload[0];                // line number echo, MSB first
     this->m_lineRecord[2] = payload[1];
-    ::memcpy(&this->m_lineRecord[LINE_RECORD_PREFIX], &payload[2], pixels);
+    (void)::memcpy(&this->m_lineRecord[LINE_RECORD_PREFIX], &payload[2], pixels);
     const Fw::SerializeStatus status =
         this->m_container.serializeRecord_ImageLine(this->m_lineRecord, LINE_RECORD_PREFIX + pixels);
     if (status != Fw::FW_SERIALIZE_OK) {
