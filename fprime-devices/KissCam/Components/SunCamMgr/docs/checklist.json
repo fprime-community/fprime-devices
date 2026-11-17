@@ -1,0 +1,3468 @@
+{
+  "schema_version": 2,
+  "tool": {
+    "name": "fprime-auto-checklist",
+    "version": "0.1.0"
+  },
+  "checklist_version": "1.2.0",
+  "module": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+  "component": "SunCamMgr",
+  "owner": "",
+  "contributors": "",
+  "project": "/home/ubuntu/repos/fprime-devices-reference",
+  "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+  "fingerprints": {
+    "1": "3a517334b335",
+    "2": "22356b5a2956",
+    "3": "9154444e47a8",
+    "4": "ba333d52c9b8",
+    "5": "a89190c3a5f8"
+  },
+  "stage": "closeout",
+  "summary": {
+    "YES": 55,
+    "NO": 13,
+    "N/A": 4,
+    "REVIEW": 0,
+    "UNCHECKED": 1
+  },
+  "items": [
+    {
+      "id": "1.1",
+      "section": "1",
+      "text": "Do requirements exist in the component SDD that define the component's expected operational behaviors?",
+      "status": "YES",
+      "notes": [],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-6: Requirement coverage (1.1-1.6): read every requirement in the SDD and decide whether the aspect this item names (behavior, input data, output data, memory, hardware I/O, runtime performance) is constrained by at least one of them, or is explicitly declared not applicable with a rationale. Deciding which aspect a shall-statement constrains is a judgement; no column or keyword convention is imposed on the requirements table. R1-R6 (traceability of ports, commands, events, telemetry and parameters to requirements) and R8 (1.7) remain tool-checked."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "B",
+          "e",
+          "h",
+          "a",
+          "v",
+          "i",
+          "o",
+          "u",
+          "r",
+          "c",
+          "o",
+          "n",
+          "s",
+          "t",
+          "r",
+          "a",
+          "i",
+          "n",
+          "e",
+          "d",
+          "b",
+          "y",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "0",
+          "3",
+          ".",
+          ".",
+          "0",
+          "1",
+          "1",
+          ",",
+          "0",
+          "1",
+          "3",
+          ".",
+          ".",
+          "0",
+          "1",
+          "7",
+          ",",
+          "0",
+          "2",
+          "1",
+          ",",
+          "0",
+          "2",
+          "5",
+          ".",
+          ".",
+          "0",
+          "2",
+          "8",
+          ",",
+          "0",
+          "3",
+          "3",
+          ".",
+          ".",
+          "0",
+          "3",
+          "7",
+          "(",
+          "s",
+          "e",
+          "t",
+          "-",
+          "u",
+          "p",
+          ",",
+          "c",
+          "o",
+          "m",
+          "m",
+          "a",
+          "n",
+          "d",
+          "s",
+          ",",
+          "d",
+          "o",
+          "w",
+          "n",
+          "l",
+          "o",
+          "a",
+          "d",
+          ",",
+          "p",
+          "u",
+          "s",
+          "h",
+          "e",
+          "s",
+          ",",
+          "r",
+          "e",
+          "j",
+          "e",
+          "c",
+          "t",
+          "i",
+          "o",
+          "n",
+          "s",
+          ")",
+          "."
+        ],
+        "kind": "review",
+        "commit": "69c71bf16019428656b30eaeb7e6c022855518ee",
+        "fingerprint": "3a517334b335",
+        "stage": "design",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "1.2",
+      "section": "1",
+      "text": "Do requirements exist in the component SDD that define input data expected to be received and handled by the component?",
+      "status": "YES",
+      "notes": [],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-6: Requirement coverage (1.1-1.6): read every requirement in the SDD and decide whether the aspect this item names (behavior, input data, output data, memory, hardware I/O, runtime performance) is constrained by at least one of them, or is explicitly declared not applicable with a rationale. Deciding which aspect a shall-statement constrains is a judgement; no column or keyword convention is imposed on the requirements table. R1-R6 (traceability of ports, commands, events, telemetry and parameters to requirements) and R8 (1.7) remain tool-checked."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "I",
+          "n",
+          "p",
+          "u",
+          "t",
+          "d",
+          "a",
+          "t",
+          "a",
+          "c",
+          "o",
+          "n",
+          "s",
+          "t",
+          "r",
+          "a",
+          "i",
+          "n",
+          "e",
+          "d",
+          "b",
+          "y",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "0",
+          "1",
+          "(",
+          "f",
+          "r",
+          "a",
+          "m",
+          "e",
+          "s",
+          "p",
+          "a",
+          "r",
+          "s",
+          "e",
+          "d",
+          "p",
+          "e",
+          "r",
+          "D",
+          "a",
+          "t",
+          "a",
+          "s",
+          "h",
+          "e",
+          "e",
+          "t",
+          "R",
+          "e",
+          "v",
+          ".",
+          "1",
+          ".",
+          "3",
+          "\u00a7",
+          "7",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "1",
+          "9",
+          "/",
+          "0",
+          "2",
+          "0",
+          "(",
+          "e",
+          "r",
+          "r",
+          "o",
+          "r",
+          "r",
+          "e",
+          "p",
+          "l",
+          "i",
+          "e",
+          "s",
+          ",",
+          "s",
+          "t",
+          "r",
+          "a",
+          "y",
+          "/",
+          "m",
+          "a",
+          "l",
+          "f",
+          "o",
+          "r",
+          "m",
+          "e",
+          "d",
+          "b",
+          "y",
+          "t",
+          "e",
+          "s",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "3",
+          "1",
+          "(",
+          "E",
+          "X",
+          "P",
+          "O",
+          "S",
+          "U",
+          "R",
+          "E",
+          "r",
+          "a",
+          "n",
+          "g",
+          "e",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "3",
+          "4",
+          "(",
+          "p",
+          "o",
+          "w",
+          "e",
+          "r",
+          "-",
+          "o",
+          "n",
+          "l",
+          "i",
+          "n",
+          "e",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "3",
+          "7",
+          "(",
+          "p",
+          "r",
+          "i",
+          "o",
+          "r",
+          "i",
+          "t",
+          "y",
+          "a",
+          "r",
+          "g",
+          "u",
+          "m",
+          "e",
+          "n",
+          "t",
+          ")",
+          "."
+        ],
+        "kind": "review",
+        "commit": "69c71bf16019428656b30eaeb7e6c022855518ee",
+        "fingerprint": "3a517334b335",
+        "stage": "design",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "1.3",
+      "section": "1",
+      "text": "Do requirements exist in the component SDD that define output data expected to be produced by the component?",
+      "status": "YES",
+      "notes": [],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-6: Requirement coverage (1.1-1.6): read every requirement in the SDD and decide whether the aspect this item names (behavior, input data, output data, memory, hardware I/O, runtime performance) is constrained by at least one of them, or is explicitly declared not applicable with a rationale. Deciding which aspect a shall-statement constrains is a judgement; no column or keyword convention is imposed on the requirements table. R1-R6 (traceability of ports, commands, events, telemetry and parameters to requirements) and R8 (1.7) remain tool-checked."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "O",
+          "u",
+          "t",
+          "p",
+          "u",
+          "t",
+          "d",
+          "a",
+          "t",
+          "a",
+          "c",
+          "o",
+          "n",
+          "s",
+          "t",
+          "r",
+          "a",
+          "i",
+          "n",
+          "e",
+          "d",
+          "b",
+          "y",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "0",
+          "1",
+          "/",
+          "0",
+          "0",
+          "2",
+          "(",
+          "f",
+          "r",
+          "a",
+          "m",
+          "e",
+          "s",
+          "s",
+          "e",
+          "n",
+          "t",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "1",
+          "5",
+          "(",
+          "I",
+          "m",
+          "a",
+          "g",
+          "e",
+          "p",
+          "r",
+          "o",
+          "d",
+          "u",
+          "c",
+          "t",
+          ":",
+          "h",
+          "e",
+          "a",
+          "d",
+          "e",
+          "r",
+          "+",
+          "l",
+          "i",
+          "n",
+          "e",
+          "r",
+          "e",
+          "c",
+          "o",
+          "r",
+          "d",
+          "s",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "2",
+          "2",
+          "(",
+          "T",
+          "a",
+          "b",
+          "l",
+          "e",
+          "3",
+          "t",
+          "e",
+          "l",
+          "e",
+          "m",
+          "e",
+          "t",
+          "r",
+          "y",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "2",
+          "3",
+          "(",
+          "e",
+          "v",
+          "e",
+          "n",
+          "t",
+          "s",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "3",
+          "7",
+          "(",
+          "p",
+          "r",
+          "o",
+          "d",
+          "u",
+          "c",
+          "t",
+          "p",
+          "r",
+          "i",
+          "o",
+          "r",
+          "i",
+          "t",
+          "y",
+          ")",
+          "."
+        ],
+        "kind": "review",
+        "commit": "69c71bf16019428656b30eaeb7e6c022855518ee",
+        "fingerprint": "3a517334b335",
+        "stage": "design",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "1.4",
+      "section": "1",
+      "text": "Do requirements exist in the component SDD for all relevant memory usage constraints for the component?",
+      "status": "YES",
+      "notes": [],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-6: Requirement coverage (1.1-1.6): read every requirement in the SDD and decide whether the aspect this item names (behavior, input data, output data, memory, hardware I/O, runtime performance) is constrained by at least one of them, or is explicitly declared not applicable with a rationale. Deciding which aspect a shall-statement constrains is a judgement; no column or keyword convention is imposed on the requirements table. R1-R6 (traceability of ports, commands, events, telemetry and parameters to requirements) and R8 (1.7) remain tool-checked."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "M",
+          "e",
+          "m",
+          "o",
+          "r",
+          "y",
+          "c",
+          "o",
+          "n",
+          "s",
+          "t",
+          "r",
+          "a",
+          "i",
+          "n",
+          "e",
+          "d",
+          "b",
+          "y",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "1",
+          "5",
+          "(",
+          "o",
+          "n",
+          "e",
+          "p",
+          "r",
+          "o",
+          "d",
+          "u",
+          "c",
+          "t",
+          "p",
+          "e",
+          "r",
+          "i",
+          "m",
+          "a",
+          "g",
+          "e",
+          ",",
+          "a",
+          "l",
+          "l",
+          "o",
+          "c",
+          "a",
+          "t",
+          "e",
+          "d",
+          "a",
+          "t",
+          "D",
+          "O",
+          "W",
+          "N",
+          "L",
+          "O",
+          "A",
+          "D",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "2",
+          "4",
+          "(",
+          "a",
+          "l",
+          "l",
+          "o",
+          "c",
+          "a",
+          "t",
+          "i",
+          "o",
+          "n",
+          "f",
+          "a",
+          "i",
+          "l",
+          "u",
+          "r",
+          "e",
+          "e",
+          "n",
+          "d",
+          "s",
+          "t",
+          "h",
+          "e",
+          "o",
+          "p",
+          "e",
+          "r",
+          "a",
+          "t",
+          "i",
+          "o",
+          "n",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "2",
+          "9",
+          "(",
+          "f",
+          "u",
+          "l",
+          "l",
+          "q",
+          "u",
+          "e",
+          "u",
+          "e",
+          "d",
+          "r",
+          "o",
+          "p",
+          "s",
+          "t",
+          "h",
+          "e",
+          "n",
+          "e",
+          "w",
+          "e",
+          "s",
+          "t",
+          "i",
+          "n",
+          "p",
+          "u",
+          "t",
+          ",",
+          "b",
+          "u",
+          "f",
+          "f",
+          "e",
+          "r",
+          "r",
+          "e",
+          "t",
+          "u",
+          "r",
+          "n",
+          "e",
+          "d",
+          ")",
+          "."
+        ],
+        "kind": "review",
+        "commit": "69c71bf16019428656b30eaeb7e6c022855518ee",
+        "fingerprint": "3a517334b335",
+        "stage": "design",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "1.5",
+      "section": "1",
+      "text": "Do requirements exist in the component SDD for all relevant hardware I/O usage constraints for the component?",
+      "status": "YES",
+      "notes": [],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-6: Requirement coverage (1.1-1.6): read every requirement in the SDD and decide whether the aspect this item names (behavior, input data, output data, memory, hardware I/O, runtime performance) is constrained by at least one of them, or is explicitly declared not applicable with a rationale. Deciding which aspect a shall-statement constrains is a judgement; no column or keyword convention is imposed on the requirements table. R1-R6 (traceability of ports, commands, events, telemetry and parameters to requirements) and R8 (1.7) remain tool-checked."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "H",
+          "a",
+          "r",
+          "d",
+          "w",
+          "a",
+          "r",
+          "e",
+          "I",
+          "/",
+          "O",
+          "c",
+          "o",
+          "n",
+          "s",
+          "t",
+          "r",
+          "a",
+          "i",
+          "n",
+          "e",
+          "d",
+          "b",
+          "y",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "0",
+          "1",
+          "(",
+          "U",
+          "A",
+          "R",
+          "T",
+          "f",
+          "r",
+          "a",
+          "m",
+          "e",
+          "s",
+          "p",
+          "e",
+          "r",
+          "D",
+          "a",
+          "t",
+          "a",
+          "s",
+          "h",
+          "e",
+          "e",
+          "t",
+          "R",
+          "e",
+          "v",
+          ".",
+          "1",
+          ".",
+          "3",
+          "\u00a7",
+          "7",
+          ",",
+          "\u00a7",
+          "7",
+          ".",
+          "1",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "0",
+          "2",
+          "(",
+          "f",
+          "r",
+          "a",
+          "m",
+          "e",
+          "s",
+          "o",
+          "n",
+          "l",
+          "y",
+          "o",
+          "n",
+          "c",
+          "o",
+          "m",
+          "m",
+          "a",
+          "n",
+          "d",
+          "/",
+          "p",
+          "u",
+          "s",
+          "h",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "1",
+          "4",
+          "(",
+          "l",
+          "i",
+          "n",
+          "e",
+          "r",
+          "e",
+          "q",
+          "u",
+          "e",
+          "s",
+          "t",
+          "s",
+          "i",
+          "n",
+          "o",
+          "r",
+          "d",
+          "e",
+          "r",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "3",
+          "6",
+          "(",
+          "C",
+          "a",
+          "p",
+          "t",
+          "u",
+          "r",
+          "e",
+          "o",
+          "n",
+          "l",
+          "y",
+          "w",
+          "h",
+          "i",
+          "l",
+          "e",
+          "R",
+          "E",
+          "A",
+          "D",
+          "Y",
+          ")",
+          "."
+        ],
+        "kind": "review",
+        "commit": "69c71bf16019428656b30eaeb7e6c022855518ee",
+        "fingerprint": "3a517334b335",
+        "stage": "design",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "1.6",
+      "section": "1",
+      "text": "Do requirements exist in the component SDD for all relevant runtime performance constraints for the component?",
+      "status": "YES",
+      "notes": [],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-6: Requirement coverage (1.1-1.6): read every requirement in the SDD and decide whether the aspect this item names (behavior, input data, output data, memory, hardware I/O, runtime performance) is constrained by at least one of them, or is explicitly declared not applicable with a rationale. Deciding which aspect a shall-statement constrains is a judgement; no column or keyword convention is imposed on the requirements table. R1-R6 (traceability of ports, commands, events, telemetry and parameters to requirements) and R8 (1.7) remain tool-checked."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "R",
+          "u",
+          "n",
+          "t",
+          "i",
+          "m",
+          "e",
+          "p",
+          "e",
+          "r",
+          "f",
+          "o",
+          "r",
+          "m",
+          "a",
+          "n",
+          "c",
+          "e",
+          "c",
+          "o",
+          "n",
+          "s",
+          "t",
+          "r",
+          "a",
+          "i",
+          "n",
+          "e",
+          "d",
+          "b",
+          "y",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "1",
+          "8",
+          "(",
+          "R",
+          "E",
+          "P",
+          "L",
+          "Y",
+          "_",
+          "T",
+          "I",
+          "M",
+          "E",
+          "O",
+          "U",
+          "T",
+          "_",
+          "T",
+          "I",
+          "C",
+          "K",
+          "S",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "1",
+          "6",
+          "(",
+          "L",
+          "I",
+          "N",
+          "E",
+          "_",
+          "R",
+          "E",
+          "T",
+          "R",
+          "I",
+          "E",
+          "S",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "3",
+          "0",
+          "(",
+          "T",
+          "L",
+          "M",
+          "_",
+          "P",
+          "E",
+          "R",
+          "I",
+          "O",
+          "D",
+          "_",
+          "T",
+          "I",
+          "C",
+          "K",
+          "S",
+          "p",
+          "e",
+          "r",
+          "i",
+          "o",
+          "d",
+          "i",
+          "c",
+          "w",
+          "r",
+          "i",
+          "t",
+          "e",
+          "s",
+          ")",
+          ",",
+          "R",
+          "E",
+          "Q",
+          "-",
+          "0",
+          "2",
+          "9",
+          "(",
+          "b",
+          "o",
+          "u",
+          "n",
+          "d",
+          "e",
+          "d",
+          "q",
+          "u",
+          "e",
+          "u",
+          "e",
+          ")",
+          "."
+        ],
+        "kind": "review",
+        "commit": "69c71bf16019428656b30eaeb7e6c022855518ee",
+        "fingerprint": "3a517334b335",
+        "stage": "design",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "1.7",
+      "section": "1",
+      "text": "Does every requirement specify a verification method?",
+      "status": "YES",
+      "notes": [
+        "R8 pass (36 requirement(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "R8 pass (36 requirement(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (R8 pass (36 requirement(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "3a517334b335",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "1.8",
+      "section": "1",
+      "text": "Are there any relevant external interface or functional requirements documented elsewhere such as ICDs/FDDs? If so, please specify in notes.",
+      "status": "YES",
+      "notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D9 pass (no External References table; cited inline: datasheet 2000)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "3a517334b335",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.1",
+      "section": "2",
+      "text": "Is the high level component functionality documented/described in the SDD?",
+      "status": "YES",
+      "notes": [
+        "SDD pass (tier platinum)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "SDD pass (tier platinum)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (SDD pass (tier platinum)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.2",
+      "section": "2",
+      "text": "Is the component block diagram documented in the SDD and consistent with the FPP model?",
+      "status": "YES",
+      "notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D9 pass (no External References table; cited inline: datasheet 2000)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.3",
+      "section": "2",
+      "text": "Is the component port table documented in the SDD and consistent with the FPP model?",
+      "status": "YES",
+      "notes": [
+        "D7 pass (7 port(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D7 pass (7 port(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D7 pass (7 port(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.4",
+      "section": "2",
+      "text": "Are the component input port behaviors described in the SDD?",
+      "status": "YES",
+      "notes": [
+        "D10 pass (4 input port(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D10 pass (4 input port(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D10 pass (4 input port(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.5",
+      "section": "2",
+      "text": "Are the component input port handlers defined?",
+      "status": "YES",
+      "notes": [
+        "D1 pass (4 input port(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D1 pass (4 input port(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D1 pass (4 input port(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.6",
+      "section": "2",
+      "text": "Are the component command handlers defined?",
+      "status": "YES",
+      "notes": [
+        "D2 pass (7 command(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D2 pass (7 command(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D2 pass (7 command(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.7",
+      "section": "2",
+      "text": "Are the component sequence diagrams documented?",
+      "status": "YES",
+      "notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D9 pass (no External References table; cited inline: datasheet 2000)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.8",
+      "section": "2",
+      "text": "Are component state machines and use-cases described in the SDD?",
+      "status": "YES",
+      "notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D9 pass (no External References table; cited inline: datasheet 2000)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.9",
+      "section": "2",
+      "text": "Are the state machine actions defined?",
+      "status": "N/A",
+      "notes": [
+        "D3: no state machines declared"
+      ],
+      "tool_status": "N/A",
+      "tool_notes": [
+        "D3: no state machines declared"
+      ],
+      "decision": {
+        "status": "N/A",
+        "notes": [
+          "Audited: read the tool evidence (D3: no state machines declared) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "N/A"
+      }
+    },
+    {
+      "id": "2.10",
+      "section": "2",
+      "text": "Are component commands, telemetry, events and parameters documented in the SDD (and consistent with the FPP model)?",
+      "status": "NO",
+      "notes": [
+        "Pre-existing SDD/FPP table name mismatches (main bc9656f); DOWNLOAD row and REQ-037 updated by this change; rest left \u2014 minimal change. [D8]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "D8: SDD command table lists 'Set Exposure', which the FPP model does not declare",
+        "D8: SDD command table lists 'Set Mode', which the FPP model does not declare",
+        "D8: event 'FrameDiscarded' is missing from the SDD event table",
+        "D8: event 'QueueOverflow' is missing from the SDD event table",
+        "D8: SDD event table lists 'FrameDiscarded, throttle 10', which the FPP model does not declare",
+        "D8: SDD event table lists 'QueueOverflow, throttle 10', which the FPP model does not declare",
+        "... 2 more"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing SDD/FPP table name mismatches (main bc9656f); DOWNLOAD row and REQ-037 updated by this change; rest left \u2014 minimal change."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "2.11",
+      "section": "2",
+      "text": "Are component data products documented and consistent with the FPP model?",
+      "status": "NO",
+      "notes": [
+        "Pre-existing (main bc9656f): ImageHeader/ImageLine records absent from the SDD data-product table; not touched by this change. [D8]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "D8: data product 'ImageHeader' is missing from the SDD data product table",
+        "D8: data product 'ImageLine' is missing from the SDD data product table"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing (main bc9656f): ImageHeader/ImageLine records absent from the SDD data-product table; not touched by this change."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "2.12",
+      "section": "2",
+      "text": "Are all data product containers assigned a default priority?",
+      "status": "YES",
+      "notes": [
+        "D4 pass (1 container(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D4 pass (1 container(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D4 pass (1 container(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.13",
+      "section": "2",
+      "text": "Does each component port in the FPP model have a known/planned use-case?",
+      "status": "YES",
+      "notes": [
+        "R6 pass (7 port(s) traced against 36 requirement(s); 7 covered by companion/SDD evidence)",
+        "D10 pass (4 input port(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "R6 pass (7 port(s) traced against 36 requirement(s); 7 covered by companion/SDD evidence)",
+        "D10 pass (4 input port(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (R6 pass (7 port(s) traced against 36 requirement(s); 7 covered by companion/SDD evidence) ; D10 pass (4 input port(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.14",
+      "section": "2",
+      "text": "Are port directions and types as expected?",
+      "status": "YES",
+      "notes": [
+        "D7 pass (7 port(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D7 pass (7 port(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D7 pass (7 port(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.15",
+      "section": "2",
+      "text": "Is the component type as expected (passive, queued or active)?",
+      "status": "YES",
+      "notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D9 pass (no External References table; cited inline: datasheet 2000)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D9 pass (no External References table; cited inline: datasheet 2000)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.16",
+      "section": "2",
+      "text": "Are all the component requirements mapped to design description and/or artifacts?",
+      "status": "YES",
+      "notes": [
+        "D5 pass (36 requirement(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D5 pass (36 requirement(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D5 pass (36 requirement(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "2.17",
+      "section": "2",
+      "text": "Does the component FPP compile and generate auto-code?",
+      "status": "YES",
+      "notes": [
+        "D6 pass (1 FPP file(s) checked)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "D6 pass (1 FPP file(s) checked)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (D6 pass (1 FPP file(s) checked)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "22356b5a2956",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.1",
+      "section": "3",
+      "text": "Are all component source dependencies listed in the CMakeLists.txt file for the component?",
+      "status": "NO",
+      "notes": [
+        "Pre-existing (main bc9656f): Os/Mutex.hpp in SunCamMgr.hpp:11, CMakeLists.txt untouched by this change. [I1]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "I1: dependency 'Os' (from #include \"Os/Mutex.hpp\") is not declared in CMakeLists.txt (add it to DEPENDS as Os)"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing (main bc9656f): Os/Mutex.hpp in SunCamMgr.hpp:11, CMakeLists.txt untouched by this change."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "3.2",
+      "section": "3",
+      "text": "Does the component compile without warnings for all required targets?",
+      "status": "YES",
+      "notes": [
+        "I2 pass (1 target(s) built)"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "I2 pass (1 target(s) built)"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (I2 pass (1 target(s) built)) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.3",
+      "section": "3",
+      "text": "Are all loops properly terminated/bounded?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/jpl-c/loop-bounds` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/jpl-c/loop-bounds` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/jpl-c/loop-bounds` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.4",
+      "section": "3",
+      "text": "Has gating been provided for any potential cyclic error/status messages (e.g. log messages, events)?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/unthrottled-cyclic-event` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/unthrottled-cyclic-event` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/unthrottled-cyclic-event` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.5",
+      "section": "3",
+      "text": "Do all switch statements have a break after each case and terminate with a default case?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/switch-default` 0 findings",
+        "`cpp/fprime/switch-case-fallthrough` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/switch-default` 0 findings",
+        "`cpp/fprime/switch-case-fallthrough` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/switch-default` 0 findings ; `cpp/fprime/switch-case-fallthrough` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.6",
+      "section": "3",
+      "text": "Verify all non-empty case statements that fall through to the following case statement are explicitly commented as such",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/switch-case-fallthrough` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/switch-case-fallthrough` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/switch-case-fallthrough` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.7",
+      "section": "3",
+      "text": "Are all variables locally defined unless global or specific visibility is required?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/global-mutable-variable` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/global-mutable-variable` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/global-mutable-variable` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.8",
+      "section": "3",
+      "text": "Are all class members defined appropriately using private, public and protected keywords?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/public-data-member` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/public-data-member` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/public-data-member` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.9",
+      "section": "3",
+      "text": "Verify that no floating point expressions are tested for equality/inequality",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/float-equality` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/float-equality` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/float-equality` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.10",
+      "section": "3",
+      "text": "Is the precision of floating point numbers sufficient to ensure accuracy and floating-point equivalence is evaluated with margin (i.e. safe floating-point usage), and is not used in a loop control?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/float-narrowing` 0 findings",
+        "`cpp/fprime/float-loop-control` 0 findings",
+        "`cpp/fprime/float-equality` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/float-narrowing` 0 findings",
+        "`cpp/fprime/float-loop-control` 0 findings",
+        "`cpp/fprime/float-equality` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/float-narrowing` 0 findings ; `cpp/fprime/float-loop-control` 0 findings ; `cpp/fprime/float-equality` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.11",
+      "section": "3",
+      "text": "Are all variables initialized before use?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/uninitialized-member` 0 findings",
+        "`cpp/uninitialized-local` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/uninitialized-member` 0 findings",
+        "`cpp/uninitialized-local` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/uninitialized-member` 0 findings ; `cpp/uninitialized-local` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.12",
+      "section": "3",
+      "text": "Are the priorities of all data products produced by the component configurable via command(s) or parameter(s)?",
+      "status": "YES",
+      "notes": [
+        "Audit (a798095e27e6 (closeout stage)): Override: DOWNLOAD's `$priority: FwDpPriorityType` argument sets the Image container priority (SunCamMgr.fpp; REQ-SunCamMgr-037; UT testDownloadPriority; system tests L2-4 (0 \u2192 10), L2-11 (7)). I3 only inspects command/parameter names, not arguments."
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "I3: container 'Image' priority is not configurable: no command or parameter mentioning 'priority' found"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Override: DOWNLOAD's `$priority: FwDpPriorityType` argument sets the Image container priority (SunCamMgr.fpp; REQ-SunCamMgr-037; UT testDownloadPriority; system tests L2-4 (0 \u2192 10), L2-11 (7)). I3 only inspects command/parameter names, not arguments."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "3.13",
+      "section": "3",
+      "text": "Are all commands acknowledged with success/failure?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/command-response` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/command-response` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/command-response` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.14",
+      "section": "3",
+      "text": "Do all validation failure cases for port and command handlers include a return statement to avoid unintended code execution beyond validation failures?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/validation-failure-return` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/validation-failure-return` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/validation-failure-return` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.15",
+      "section": "3",
+      "text": "Are all internal port interfaces invoked via the auto-coded internal port invoke() function?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/internal-port-invoke` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/internal-port-invoke` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/internal-port-invoke` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.16",
+      "section": "3",
+      "text": "All pointer arguments to functions are checked to be not nullptr using FW_ASSERT",
+      "status": "NO",
+      "notes": [
+        "Pre-existing (main bc9656f): SunCamMgr.cpp:686-687 frame parser, outside this change's hunks (217, 246-248). [cpp/fprime/checking-parameter-values]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:686 Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:687 Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:688 Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:772 Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:773 Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:774 Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "... 5 more"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing (main bc9656f): SunCamMgr.cpp:686-687 frame parser, outside this change's hunks (217, 246-248)."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "3.17",
+      "section": "3",
+      "text": "Assumptions on software state are validated using FW_ASSERT.",
+      "status": "NO",
+      "notes": [
+        "Pre-existing (main bc9656f): SunCamMgr.cpp:133, 197, 623, 1018 \u2014 handlers outside this change. [cpp/fprime/jpl-c/use-of-assertions-density]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "`cpp/fprime/jpl-c/use-of-assertions-density` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:133 All functions of more than 10 lines should have at least one assertion, unless they handle errors by returning a status enum or bool, or by emitting a WARNING/FATAL event.",
+        "`cpp/fprime/jpl-c/use-of-assertions-density` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:197 All functions of more than 10 lines should have at least one assertion, unless they handle errors by returning a status enum or bool, or by emitting a WARNING/FATAL event.",
+        "`cpp/fprime/jpl-c/use-of-assertions-density` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:623 All functions of more than 10 lines should have at least one assertion, unless they handle errors by returning a status enum or bool, or by emitting a WARNING/FATAL event.",
+        "`cpp/fprime/jpl-c/use-of-assertions-density` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:1018 All functions of more than 10 lines should have at least one assertion, unless they handle errors by returning a status enum or bool, or by emitting a WARNING/FATAL event."
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing (main bc9656f): SunCamMgr.cpp:133, 197, 623, 1018 \u2014 handlers outside this change."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "3.18",
+      "section": "3",
+      "text": "Assertions shall not be used to validate state that could be dependent on hardware or user input.",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/assert-on-untrusted-input` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/assert-on-untrusted-input` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/assert-on-untrusted-input` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.19",
+      "section": "3",
+      "text": "Verify all ISR code is free of floating point operations",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/no-float-in-isr` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/no-float-in-isr` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/no-float-in-isr` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.20",
+      "section": "3",
+      "text": "Has the ISR code been optimized to minimize length/execution time?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/isr-complexity` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/isr-complexity` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/isr-complexity` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.21",
+      "section": "3",
+      "text": "Verify any software state that's expected upon receive of an interrupt is configured prior to enabling/setting conditions that would allow the interrupt to trigger.",
+      "status": "N/A",
+      "notes": [
+        "no interrupt handlers: SunCamMgr is driven by Drv.ByteStreamDriver ports and the scheduler tick (no *_isr/*irq* functions in SunCamMgr.cpp/.hpp)"
+      ],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-1: ISR state before enable (3.21): for every ISR-named function (*_isr, *interrupt_handler*, *_irq*) find the code that enables its interrupt; every variable the ISR reads or writes must be assigned on a path that completes before that enable call."
+      ],
+      "decision": {
+        "status": "N/A",
+        "notes": [
+          "no interrupt handlers: SunCamMgr is driven by Drv.ByteStreamDriver ports and the scheduler tick (no *_isr/*irq* functions in SunCamMgr.cpp/.hpp)"
+        ],
+        "kind": "review",
+        "commit": "564b2a9110cee1f494e1435ea6f0357cbcf55d63",
+        "fingerprint": "9154444e47a8",
+        "stage": "implementation",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "3.22",
+      "section": "3",
+      "text": "Verify there are no blocking operations in ISRs",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/no-blocking-in-isr` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/no-blocking-in-isr` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/no-blocking-in-isr` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.23",
+      "section": "3",
+      "text": "Verify any relevant interrupt enables and interrupts are cleared during initialization and re-enabled selectively as needed.",
+      "status": "N/A",
+      "notes": [
+        "no interrupt enables: no peripheral or ISR configuration in the component (UART owned by the driver component)"
+      ],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-2: Interrupt enables cleared at init (3.23): in the constructor/init/configure/preamble, interrupt-enable bits must be explicitly cleared or masked before peripheral configuration, not assumed clear from reset."
+      ],
+      "decision": {
+        "status": "N/A",
+        "notes": [
+          "no interrupt enables: no peripheral or ISR configuration in the component (UART owned by the driver component)"
+        ],
+        "kind": "review",
+        "commit": "564b2a9110cee1f494e1435ea6f0357cbcf55d63",
+        "fingerprint": "9154444e47a8",
+        "stage": "implementation",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "3.24",
+      "section": "3",
+      "text": "Are RateGroup schedule calls non-blocking?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/no-blocking-in-sched-handler` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/no-blocking-in-sched-handler` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/no-blocking-in-sched-handler` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.25",
+      "section": "3",
+      "text": "Verify no synchronous file access is done within a critical region (e.g. SchedIn)",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/no-file-access-in-critical` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/no-file-access-in-critical` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/no-file-access-in-critical` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.26",
+      "section": "3",
+      "text": "Verify that all loops and if/else statements are compound statements (i.e. always use brackets {})",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/compound-statements` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/compound-statements` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/compound-statements` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.27",
+      "section": "3",
+      "text": "Verify that all divisions first check for small numbers (including zero)",
+      "status": "NO",
+      "notes": [
+        "Pre-existing (main bc9656f): SunCamMgr.cpp:541 m_linesPerSlot (set from Resolution at set-up), outside this change. [cpp/fprime/division-guard, cpp/fprime/float-division-guard]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "`cpp/fprime/division-guard` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:541 The divisor m_linesPerSlot is not checked against zero before this % operation.",
+        "`cpp/fprime/float-division-guard` 0 findings"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing (main bc9656f): SunCamMgr.cpp:541 m_linesPerSlot (set from Resolution at set-up), outside this change."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "3.28",
+      "section": "3",
+      "text": "Verify all array accesses are checked to be within array index bounds",
+      "status": "NO",
+      "notes": [
+        "Pre-existing: same findings as 3.16, outside this change's hunks. [cpp/fprime/unchecked-array-index, cpp/fprime/checking-parameter-values]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "`cpp/fprime/unchecked-array-index` 0 findings",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:686 Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:687 Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:688 Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:772 Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "`cpp/fprime/checking-parameter-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:773 Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "... 6 more"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing: same findings as 3.16, outside this change's hunks."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "3.29",
+      "section": "3",
+      "text": "Verify there are no function declarations within a function.",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/no-function-decl-in-function` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/no-function-decl-in-function` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/no-function-decl-in-function` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.30",
+      "section": "3",
+      "text": "Verify that the three expressions in all for statements only concern flow control",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/for-header-flow-control` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/for-header-flow-control` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/for-header-flow-control` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.31",
+      "section": "3",
+      "text": "Verify that there are no dependencies on signed integer overflow behavior",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/signed-overflow` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/signed-overflow` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/signed-overflow` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.32",
+      "section": "3",
+      "text": "Verify return values are used or voided otherwise.",
+      "status": "NO",
+      "notes": [
+        "Pre-existing (main bc9656f): memset returns in the constructor, SunCamMgr.cpp:115-120, outside this change. [cpp/fprime/jpl-c/checking-return-values]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "`cpp/fprime/jpl-c/checking-return-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:115 The return value of non-void function memset is not checked.",
+        "`cpp/fprime/jpl-c/checking-return-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:116 The return value of non-void function memset is not checked.",
+        "`cpp/fprime/jpl-c/checking-return-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:117 The return value of non-void function memset is not checked.",
+        "`cpp/fprime/jpl-c/checking-return-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:118 The return value of non-void function memset is not checked.",
+        "`cpp/fprime/jpl-c/checking-return-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:119 The return value of non-void function memset is not checked.",
+        "`cpp/fprime/jpl-c/checking-return-values` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:120 The return value of non-void function memset is not checked.",
+        "... 5 more"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing (main bc9656f): memset returns in the constructor, SunCamMgr.cpp:115-120, outside this change."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "3.33",
+      "section": "3",
+      "text": "Verify units are incorporated into variable name, where applicable",
+      "status": "YES",
+      "notes": [],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-3: Units in names (3.33): every variable, member, parameter, telemetry channel and command argument carrying a physical quantity must encode its unit in the name (timeoutMs, angleRad, sizeBytes) or in an FPP annotation."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "m_ticksWaiting/m_tickCount (ticks), m_discardedBytes/DiscardedBytes (bytes), m_linesPerSlot/m_pixelsPerLine/m_linesExpected (lines, pixels), CameraUptime format '{} s'; Exposure/EXPOSURE are camera register steps annotated in the FPP (steps of 89.5 us, 2..960); DOWNLOAD priority is a dimensionless FwDpPriorityType"
+        ],
+        "kind": "review",
+        "commit": "564b2a9110cee1f494e1435ea6f0357cbcf55d63",
+        "fingerprint": "9154444e47a8",
+        "stage": "implementation",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "3.34",
+      "section": "3",
+      "text": "Verify that all invariant numbers are in enums, static constexpr or #defines. Enums or static constexpr must be used unless #define is only way to specify constant.",
+      "status": "NO",
+      "notes": [
+        "Pre-existing (main bc9656f): frame byte offsets at SunCamMgr.cpp:488-489, outside this change. [cpp/fprime/magic-numbers, cpp/fprime/define-constant]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "`cpp/fprime/magic-numbers` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:488 Magic number 5; consider a named constant (enum, static constexpr, or #define).",
+        "`cpp/fprime/magic-numbers` lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:489 Magic number 6; consider a named constant (enum, static constexpr, or #define).",
+        "`cpp/fprime/define-constant` 0 findings"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing (main bc9656f): frame byte offsets at SunCamMgr.cpp:488-489, outside this change."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "3.35",
+      "section": "3",
+      "text": "Verify no use of printf",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/no-printf` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/no-printf` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/no-printf` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.36",
+      "section": "3",
+      "text": "Does the component use platform independent standard data types (e.g. I32, F32 etc.) rather than primitive data types (e.g. int, float etc.)?",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/jpl-c/basic-int-types` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/jpl-c/basic-int-types` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/jpl-c/basic-int-types` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "3.37",
+      "section": "3",
+      "text": "Does the component pass static analysis?",
+      "status": "NO",
+      "notes": [
+        "Pre-existing: I4 medium findings are the 3.16 ones, outside this change's hunks. [I4]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "I4: lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:686: [medium] cpp/fprime/checking-parameter-values: Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "I4: lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:687: [medium] cpp/fprime/checking-parameter-values: Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "I4: lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:688: [medium] cpp/fprime/checking-parameter-values: Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "I4: lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:772: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "I4: lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:773: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "I4: lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:774: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "... 17 more"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing: I4 medium findings are the 3.16 ones, outside this change's hunks."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "9154444e47a8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "3.38",
+      "section": "3",
+      "text": "Does the implementation address all component requirements and remains consistent with the documented design?",
+      "status": "YES",
+      "notes": [],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-4: Implementation matches requirements and design (3.38): for each requirement row locate the handler(s) that satisfy it and confirm the behaviour including each error path the SDD describes; report requirements with no implementing code and handler behaviour the SDD does not describe."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "REQ-SunCamMgr-001..036 each traced to a passing SDD \u00a78.2 unit test (34/34 fprime-util check); REQ-SunCamMgr-037 -> DOWNLOAD_cmdHandler SunCamMgr.cpp:246-248 (setPriority when non-zero after dpGet_Image, default IMAGE_DP_PRIORITY kept when zero; allocation-failure path unchanged) verified by testDownloadPriority"
+        ],
+        "kind": "review",
+        "commit": "564b2a9110cee1f494e1435ea6f0357cbcf55d63",
+        "fingerprint": "9154444e47a8",
+        "stage": "implementation",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "4.1",
+      "section": "4",
+      "text": "Have all test output/results been published?",
+      "status": "UNCHECKED",
+      "notes": [
+        "U1 not run: not done yet: no published unit-test artifacts given (--artifacts-dir)"
+      ],
+      "tool_status": "UNCHECKED",
+      "tool_notes": [
+        "U1 not run: not done yet: no published unit-test artifacts given (--artifacts-dir)"
+      ]
+    },
+    {
+      "id": "4.2",
+      "section": "4",
+      "text": "Are all component unit test source dependencies listed in the CMakeLists.txt file for the component?",
+      "status": "NO",
+      "notes": [
+        "Pre-existing (main bc9656f): Fw/Dp include in test/ut/SunCamMgrTester.cpp:11 predates this change. [U3]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "U3: unit-test dependency 'Fw/Dp' (from #include \"Fw/Dp/DpContainer.hpp\") is not declared in the module's CMake files (add it to UT_DEPENDS/DEPENDS)"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing (main bc9656f): Fw/Dp include in test/ut/SunCamMgrTester.cpp:11 predates this change."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "ba333d52c9b8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "4.3",
+      "section": "4",
+      "text": "Have input data ranges been tested for boundary conditions?",
+      "status": "YES",
+      "notes": [],
+      "tool_status": "REVIEW",
+      "tool_notes": [
+        "CL-5: Boundary tests (4.3): for each bounded quantity (array sizes, FW_ASSERT limits, configuration constants, command-argument ranges, queue depths) a unit test must exercise the limit value and one past it."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "priority 0 (sentinel) and 0xFFFFFFFF (U32 max) in testDownloadPriority; HD slot limit SLOT_0 vs SLOT_1..3 in testDownloadHdFourSlots; line retry limit and one past in testDownloadLineRetryAndFail; line number 255/256 in testCommandFrameBytes; queue depth in testQueueFullHooks; product full in testDownloadFailedSendAndProductFull; EXPOSURE 2..960 bounds in testParameterPushFailure"
+        ],
+        "kind": "review",
+        "commit": "564b2a9110cee1f494e1435ea6f0357cbcf55d63",
+        "fingerprint": "ba333d52c9b8",
+        "stage": "implementation",
+        "date": "2026-11-13"
+      }
+    },
+    {
+      "id": "4.4",
+      "section": "4",
+      "text": "Do the unit tests pass a memory leak check?",
+      "status": "NO",
+      "notes": [
+        "LeakSanitizer (detect_leaks=1) on fprime-devices_KissCam_Components_SunCamMgr_ut_exe: 34/34 tests pass, direct leaks from Os::Generic::PriorityQueue::create via the autocoded SunCamMgrComponentBase::init \u2014 framework/autocode, present on baseline tests, not introduced by this change; the tool looked for a lib/-prefixed executable name. [U4]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "U4: unit-test executable not found after 'fprime-util build --ut'"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "LeakSanitizer (detect_leaks=1) on fprime-devices_KissCam_Components_SunCamMgr_ut_exe: 34/34 tests pass, direct leaks from Os::Generic::PriorityQueue::create via the autocoded SunCamMgrComponentBase::init \u2014 framework/autocode, present on baseline tests, not introduced by this change; the tool looked for a lib/-prefixed executable name."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "ba333d52c9b8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "4.5",
+      "section": "4",
+      "text": "Is there sufficient code coverage?",
+      "status": "YES",
+      "notes": [
+        "Audit (a798095e27e6 (closeout stage)): Override: `fprime-util check --coverage` in the development stage (ASAN_OPTIONS=detect_leaks=0) measured lines 98.5% (715/726), functions 98.4%, branches 84.4% \u2014 dev-evidence/ut/print-summary.txt + ut-check.log in suncam-v2-2026-11-13.zip (manifest-pinned); the tool's run failed on the LeakSanitizer exit of the autocoded init (4.4), not on coverage."
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "U5: 'fprime-util check --coverage' failed:\nitComponents() /home/ubuntu/repos/fprime-devices-reference/build-fprime-automatic-native-ut/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgrTesterHelpers.cpp:125\n1:     #8 0x654b96a63e5d in KissCam::SunCamMgrTester::SunCamMgrTester() /home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/test/ut/SunCamMgrTester.cpp:47\n1:     #9 0x654b96a3851d in SunCamMgr_testModeChangeRepushesExposure_Test::TestBody() /home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/test/ut/SunCamMgrTestMain.cpp:42\n1:     #10 0x654b970c867f in void testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2599\n1:     #11 0x654b9709e0e7 in void testing::internal::HandleExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2635\n1:     #12 0x654b96ff454b in testing::Test::Run() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2674\n1:     #13 0x654b96ff8157 in testing::TestInfo::Run() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2853\n1:     #14 0x654b96ffc972 in testing::TestSuite::Run() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:3012\n1:     #15 0x654b9704261a in testing::internal::UnitTestImpl::RunAllTests() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:5870\n1:     #16 0x654b970cfaca in bool testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2599\n1:     #17 0x654b970a3fc1 in bool testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2635\n1:     #18 0x654b970356af in testing::UnitTest::Run() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:5444\n1:     #19 0x654b96a4ad76 in RUN_ALL_TESTS() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/include/gtest/gtest.h:2293\n1:     #20 0x654b96a3a22e in main /home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/test/ut/SunCamMgrTestMain.cpp:52\n1:     #21 0x7ecc72e29d8f  (/lib/x86_64-linux-gnu/libc.so.6+0x29d8f) (BuildId: 12b87db2df813df96f66d6f02dd18ea5c8b7cf8d)\n1: \n1: SUMMARY: AddressSanitizer: 193120 byte(s) leaked in 136 allocation(s).\n1/1 Test #1: fprime-devices_KissCam_Components_SunCamMgr_ut_exe ...***Failed    1.28 sec\n\n0% tests passed, 1 tests failed out of 1\n\nTotal Test time (real) =   1.36 sec\n\nThe following tests FAILED:\n\t  1 - fprime-devices_KissCam_Components_SunCamMgr_ut_exe (Failed)\n[INFO] Running CTest with context: ['fprime-devices_KissCam_Components_SunCamMgr_ut_exe']\nErrors while running CTest\nOutput from these tests are in: /home/ubuntu/repos/fprime-devices-reference/build-fprime-automatic-native-ut/fprime-devices/KissCam/Components/SunCamMgr/Testing/Temporary/LastTest.log\nUse \"--rerun-failed --output-on-failure\" to re-run the failed cases verbosely.\n[ERROR] CalledProcessError: Command '['ctest', '--test-dir', '/home/ubuntu/repos/fprime-devices-reference/build-fprime-automatic-native-ut/fprime-devices/KissCam/Components/SunCamMgr', '--no-tests=error', '-V', '-R', '^(fprime-devices_KissCam_Components_SunCamMgr_ut_exe)$']' returned non-zero exit status 8.\n"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Override: `fprime-util check --coverage` in the development stage (ASAN_OPTIONS=detect_leaks=0) measured lines 98.5% (715/726), functions 98.4%, branches 84.4% \u2014 dev-evidence/ut/print-summary.txt + ut-check.log in suncam-v2-2026-11-13.zip (manifest-pinned); the tool's run failed on the LeakSanitizer exit of the autocoded init (4.4), not on coverage."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "ba333d52c9b8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "5.1",
+      "section": "5",
+      "text": "Verify no TBDs, TODOs or printfs in the code (no incomplete code).",
+      "status": "YES",
+      "notes": [
+        "`cpp/fprime/incomplete-code` 0 findings",
+        "`cpp/fprime/no-printf` 0 findings"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "`cpp/fprime/incomplete-code` 0 findings",
+        "`cpp/fprime/no-printf` 0 findings"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (`cpp/fprime/incomplete-code` 0 findings ; `cpp/fprime/no-printf` 0 findings) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "a89190c3a5f8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "5.2",
+      "section": "5",
+      "text": "Verify that component can be instantiated, connected, and compiled along with the Topology for all applicable targets.",
+      "status": "YES",
+      "notes": [
+        "C1 pass (1 deployment(s) checked for 'SunCamMgr')"
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "C1 pass (1 deployment(s) checked for 'SunCamMgr')"
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (C1 pass (1 deployment(s) checked for 'SunCamMgr')) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "a89190c3a5f8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "5.3",
+      "section": "5",
+      "text": "Verify that the flight deployment with component instantiation/connections runs successfully on a hardware platform. Indicate hardware platform used for checkout in Notes.",
+      "status": "YES",
+      "notes": [
+        "C2 pass (record hardware-run.md)",
+        "Attested by the hardware-run record checked by C2."
+      ],
+      "tool_status": "YES",
+      "tool_notes": [
+        "C2 pass (record hardware-run.md)",
+        "Attested by the hardware-run record checked by C2."
+      ],
+      "decision": {
+        "status": "YES",
+        "notes": [
+          "Audited: read the tool evidence (C2 pass (record hardware-run.md) ; Attested by the hardware-run record checked by C2.) in checklist-work/closeout (check-records.jsonl, clang-tidy.log, checklist.sarif) at a798095; agrees."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "a89190c3a5f8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "YES"
+      }
+    },
+    {
+      "id": "5.4",
+      "section": "5",
+      "text": "Update the SDD to accurately reflect the final state of the component. Add any additional design detail, including any known idiosyncrasies.",
+      "status": "NO",
+      "notes": [
+        "Pre-existing D8 mismatches as 2.10/2.11; the rows this change touched (DOWNLOAD, Image priority, Table 4, \u00a78) reflect the final state. [D7, D8]"
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "D7 pass (7 port(s) checked)",
+        "D8: SDD command table lists 'Set Exposure', which the FPP model does not declare",
+        "D8: SDD command table lists 'Set Mode', which the FPP model does not declare",
+        "D8: event 'FrameDiscarded' is missing from the SDD event table",
+        "D8: event 'QueueOverflow' is missing from the SDD event table",
+        "D8: SDD event table lists 'FrameDiscarded, throttle 10', which the FPP model does not declare",
+        "... 7 more"
+      ],
+      "decision": {
+        "status": "NO",
+        "notes": [
+          "Pre-existing D8 mismatches as 2.10/2.11; the rows this change touched (DOWNLOAD, Image priority, Table 4, \u00a78) reflect the final state."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "a89190c3a5f8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    },
+    {
+      "id": "5.5",
+      "section": "5",
+      "text": "Validate that CI passes.",
+      "status": "N/A",
+      "notes": [
+        "Audit (a798095e27e6 (closeout stage)): No CI in this repository: fprime-community/fprime-devices has no .github/workflows and the autobot fork reports 0 check-runs for a798095."
+      ],
+      "tool_status": "NO",
+      "tool_notes": [
+        "C3: no check runs reported for a798095e27e64eccddc8165813daf59d1341b016"
+      ],
+      "decision": {
+        "status": "N/A",
+        "notes": [
+          "No CI in this repository: fprime-community/fprime-devices has no .github/workflows and the autobot fork reports 0 check-runs for a798095."
+        ],
+        "kind": "audit",
+        "commit": "a798095e27e64eccddc8165813daf59d1341b016",
+        "fingerprint": "a89190c3a5f8",
+        "stage": "closeout",
+        "date": "2026-11-16",
+        "tool_status": "NO"
+      }
+    }
+  ],
+  "queue": [
+    {
+      "id": "4.1",
+      "section": "4",
+      "reason": "audit",
+      "status": "UNCHECKED",
+      "rule": null,
+      "notes": [
+        "U1 not run: not done yet: no published unit-test artifacts given (--artifacts-dir)"
+      ],
+      "rule_text": ""
+    }
+  ],
+  "checks": {
+    "R1": {
+      "id": "R1",
+      "name": "Requirement per command",
+      "category": "requirements",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "command 'READ_REGISTER' has no requirement referencing it (add a requirement mentioning 'READ_REGISTER')"
+      ],
+      "detail": "7 command(s) traced against 36 requirement(s)"
+    },
+    "R2": {
+      "id": "R2",
+      "name": "Requirement per telemetry channel",
+      "category": "requirements",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "telemetry channel 'SetupState' has no requirement referencing it (add a requirement mentioning 'SetupState')",
+        "telemetry channel 'CurrentOperation' has no requirement referencing it (add a requirement mentioning 'CurrentOperation')",
+        "telemetry channel 'CameraMode' has no requirement referencing it (add a requirement mentioning 'CameraMode')",
+        "telemetry channel 'ExposureReadback' has no requirement referencing it (add a requirement mentioning 'ExposureReadback')",
+        "telemetry channel 'CameraUptime' has no requirement referencing it (add a requirement mentioning 'CameraUptime')",
+        "telemetry channel 'CameraValidCmds' has no requirement referencing it (add a requirement mentioning 'CameraValidCmds')",
+        "telemetry channel 'CameraInvalidCmds' has no requirement referencing it (add a requirement mentioning 'CameraInvalidCmds')",
+        "telemetry channel 'RegisterValue' has no requirement referencing it (add a requirement mentioning 'RegisterValue')",
+        "telemetry channel 'LastCameraError' has no requirement referencing it (add a requirement mentioning 'LastCameraError')",
+        "telemetry channel 'CameraErrors' has no requirement referencing it (add a requirement mentioning 'CameraErrors')",
+        "telemetry channel 'Timeouts' has no requirement referencing it (add a requirement mentioning 'Timeouts')",
+        "telemetry channel 'DiscardedBytes' has no requirement referencing it (add a requirement mentioning 'DiscardedBytes')",
+        "telemetry channel 'MalformedReplies' has no requirement referencing it (add a requirement mentioning 'MalformedReplies')",
+        "telemetry channel 'ImagesCaptured' has no requirement referencing it (add a requirement mentioning 'ImagesCaptured')",
+        "telemetry channel 'LinesDownloaded' has no requirement referencing it (add a requirement mentioning 'LinesDownloaded')",
+        "telemetry channel 'ProductsSent' has no requirement referencing it (add a requirement mentioning 'ProductsSent')",
+        "telemetry channel 'QueueOverflows' has no requirement referencing it (add a requirement mentioning 'QueueOverflows')"
+      ],
+      "detail": "19 telemetry channel(s) traced against 36 requirement(s)"
+    },
+    "R3": {
+      "id": "R3",
+      "name": "Requirement per event",
+      "category": "requirements",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "event 'SetupComplete' has no requirement referencing it (add a requirement mentioning 'SetupComplete')",
+        "event 'SetupFailed' has no requirement referencing it (add a requirement mentioning 'SetupFailed')",
+        "event 'SettingApplied' has no requirement referencing it (add a requirement mentioning 'SettingApplied')",
+        "event 'SettingRejected' has no requirement referencing it (add a requirement mentioning 'SettingRejected')",
+        "event 'SettingPushFailed' has no requirement referencing it (add a requirement mentioning 'SettingPushFailed')",
+        "event 'ExposureReadback' has no requirement referencing it (add a requirement mentioning 'ExposureReadback')",
+        "event 'PingReply' has no requirement referencing it (add a requirement mentioning 'PingReply')",
+        "event 'CaptureComplete' has no requirement referencing it (add a requirement mentioning 'CaptureComplete')",
+        "event 'DownloadStarted' has no requirement referencing it (add a requirement mentioning 'DownloadStarted')",
+        "event 'DownloadComplete' has no requirement referencing it (add a requirement mentioning 'DownloadComplete')",
+        "event 'DownloadAborted' has no requirement referencing it (add a requirement mentioning 'DownloadAborted')",
+        "event 'DownloadFailed' has no requirement referencing it (add a requirement mentioning 'DownloadFailed')",
+        "event 'LineRetry' has no requirement referencing it (add a requirement mentioning 'LineRetry')",
+        "event 'RegisterRead' has no requirement referencing it (add a requirement mentioning 'RegisterRead')",
+        "event 'CommandRejected' has no requirement referencing it (add a requirement mentioning 'CommandRejected')",
+        "event 'CameraError' has no requirement referencing it (add a requirement mentioning 'CameraError')",
+        "event 'ReplyTimeout' has no requirement referencing it (add a requirement mentioning 'ReplyTimeout')",
+        "event 'FrameDiscarded' has no requirement referencing it (add a requirement mentioning 'FrameDiscarded')",
+        "event 'CameraRestarted' has no requirement referencing it (add a requirement mentioning 'CameraRestarted')",
+        "event 'ModeMismatch' has no requirement referencing it (add a requirement mentioning 'ModeMismatch')",
+        "event 'SendFailed' has no requirement referencing it (add a requirement mentioning 'SendFailed')",
+        "event 'ProductAllocationFailed' has no requirement referencing it (add a requirement mentioning 'ProductAllocationFailed')",
+        "event 'QueueOverflow' has no requirement referencing it (add a requirement mentioning 'QueueOverflow')"
+      ],
+      "detail": "23 event(s) traced against 36 requirement(s)"
+    },
+    "R4": {
+      "id": "R4",
+      "name": "Requirement per parameter",
+      "category": "requirements",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "2 parameter(s) traced against 36 requirement(s)"
+    },
+    "R5": {
+      "id": "R5",
+      "name": "Requirement per data product",
+      "category": "requirements",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "data product 'ImageHeader' has no requirement referencing it (add a requirement mentioning 'ImageHeader')",
+        "data product 'ImageLine' has no requirement referencing it (add a requirement mentioning 'ImageLine')"
+      ],
+      "detail": "3 data product(s) traced against 36 requirement(s)"
+    },
+    "R6": {
+      "id": "R6",
+      "name": "Requirement per port/interface",
+      "category": "requirements",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "7 port(s) traced against 36 requirement(s); 7 covered by companion/SDD evidence"
+    },
+    "R7": {
+      "id": "R7",
+      "name": "Requirement parent traceability",
+      "category": "requirements",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "requirement 'REQ-SunCamMgr-001' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:22) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-002' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:23) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-003' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:24) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-004' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:25) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-005' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:26) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-006' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:27) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-007' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:28) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-008' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:29) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-009' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:30) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-010' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:31) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-011' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:32) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-012' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:33) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-013' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:34) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-014' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:35) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-015' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:36) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-016' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:37) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-017' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:38) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-018' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:39) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-019' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:40) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-020' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:41) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-021' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:42) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-022' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:43) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-023' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:44) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-024' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:45) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-025' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:46) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-026' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:47) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-027' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:48) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-028' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:49) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-029' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:50) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-030' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:51) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-031' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:52) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-033' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:53) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-034' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:54) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-035' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:55) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-036' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:56) has no parent trace (add a Parent/Trace column entry linking a parent requirement)",
+        "requirement 'REQ-SunCamMgr-037' (/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/docs/sdd.md:57) has no parent trace (add a Parent/Trace column entry linking a parent requirement)"
+      ],
+      "detail": "36 requirement(s) checked"
+    },
+    "R8": {
+      "id": "R8",
+      "name": "Requirement verification method",
+      "category": "requirements",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "36 requirement(s) checked"
+    },
+    "D1": {
+      "id": "D1",
+      "name": "Input port handlers defined",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "4 input port(s) checked"
+    },
+    "D2": {
+      "id": "D2",
+      "name": "Command handlers defined",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "7 command(s) checked"
+    },
+    "D3": {
+      "id": "D3",
+      "name": "State machine actions defined",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "skip",
+      "failures": [],
+      "detail": "no state machines declared"
+    },
+    "D4": {
+      "id": "D4",
+      "name": "Data product containers have default priority",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "1 container(s) checked"
+    },
+    "D5": {
+      "id": "D5",
+      "name": "Requirements mapped to design artifacts",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "36 requirement(s) checked"
+    },
+    "D7": {
+      "id": "D7",
+      "name": "SDD port table matches FPP",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "7 port(s) checked"
+    },
+    "D8": {
+      "id": "D8",
+      "name": "SDD dictionary tables match FPP",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "SDD command table lists 'Set Exposure', which the FPP model does not declare",
+        "SDD command table lists 'Set Mode', which the FPP model does not declare",
+        "event 'FrameDiscarded' is missing from the SDD event table",
+        "event 'QueueOverflow' is missing from the SDD event table",
+        "SDD event table lists 'FrameDiscarded, throttle 10', which the FPP model does not declare",
+        "SDD event table lists 'QueueOverflow, throttle 10', which the FPP model does not declare",
+        "SDD event table lists 'SetupStarted', which the FPP model does not declare",
+        "SDD event table lists 'SleepEntered', which the FPP model does not declare",
+        "data product 'ImageHeader' is missing from the SDD data product table",
+        "data product 'ImageLine' is missing from the SDD data product table"
+      ],
+      "detail": "54 dictionary item(s) checked"
+    },
+    "D9": {
+      "id": "D9",
+      "name": "SDD design sections present",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "no External References table; cited inline: datasheet 2000"
+    },
+    "D10": {
+      "id": "D10",
+      "name": "Input port behaviour documented",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "4 input port(s) checked"
+    },
+    "I1": {
+      "id": "I1",
+      "name": "Source dependencies listed in CMakeLists",
+      "category": "implementation",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "dependency 'Os' (from #include \"Os/Mutex.hpp\") is not declared in CMakeLists.txt (add it to DEPENDS as Os)"
+      ],
+      "detail": "1 dependency module(s) checked; 1 provided by FPP/implicit framework dependencies"
+    },
+    "I3": {
+      "id": "I3",
+      "name": "Data product priorities configurable",
+      "category": "implementation",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "container 'Image' priority is not configurable: no command or parameter mentioning 'priority' found"
+      ],
+      "detail": "1 container(s) checked against 9 command(s)/parameter(s)"
+    },
+    "U3": {
+      "id": "U3",
+      "name": "Unit-test dependencies in CMakeLists",
+      "category": "unit-testing",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "unit-test dependency 'Fw/Dp' (from #include \"Fw/Dp/DpContainer.hpp\") is not declared in the module's CMake files (add it to UT_DEPENDS/DEPENDS)"
+      ],
+      "detail": "1 dependency module(s) checked"
+    },
+    "C2": {
+      "id": "C2",
+      "name": "Hardware run record",
+      "category": "close-out",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "record hardware-run.md"
+    },
+    "D6": {
+      "id": "D6",
+      "name": "FPP compiles and generates auto-code",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "1 FPP file(s) checked"
+    },
+    "I4": {
+      "id": "I4",
+      "name": "Passes static analysis",
+      "category": "implementation",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:686: [medium] cpp/fprime/checking-parameter-values: Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:687: [medium] cpp/fprime/checking-parameter-values: Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:688: [medium] cpp/fprime/checking-parameter-values: Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:772: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:773: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:774: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:810: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:811: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:959: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:960: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:961: [medium] cpp/fprime/checking-parameter-values: Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition).",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:541: [medium] cpp/fprime/division-guard: The divisor m_linesPerSlot is not checked against zero before this % operation.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:115: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memset is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:116: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memset is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:117: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memset is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:118: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memset is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:119: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memset is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:120: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memset is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:300: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memcpy is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:301: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memset is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:620: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memcpy is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:674: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memcpy is not checked.",
+        "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp:961: [medium] cpp/fprime/jpl-c/checking-return-values: The return value of non-void function memcpy is not checked."
+      ],
+      "detail": "29 finding(s) in module; threshold medium"
+    },
+    "I2": {
+      "id": "I2",
+      "name": "Compiles without warnings",
+      "category": "implementation",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "1 target(s) built"
+    },
+    "U4": {
+      "id": "U4",
+      "name": "Memory leak check passes",
+      "category": "unit-testing",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "unit-test executable not found after 'fprime-util build --ut'"
+      ],
+      "detail": ""
+    },
+    "U5": {
+      "id": "U5",
+      "name": "Sufficient code coverage",
+      "category": "unit-testing",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "'fprime-util check --coverage' failed:\nitComponents() /home/ubuntu/repos/fprime-devices-reference/build-fprime-automatic-native-ut/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgrTesterHelpers.cpp:125\n1:     #8 0x654b96a63e5d in KissCam::SunCamMgrTester::SunCamMgrTester() /home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/test/ut/SunCamMgrTester.cpp:47\n1:     #9 0x654b96a3851d in SunCamMgr_testModeChangeRepushesExposure_Test::TestBody() /home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/test/ut/SunCamMgrTestMain.cpp:42\n1:     #10 0x654b970c867f in void testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2599\n1:     #11 0x654b9709e0e7 in void testing::internal::HandleExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2635\n1:     #12 0x654b96ff454b in testing::Test::Run() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2674\n1:     #13 0x654b96ff8157 in testing::TestInfo::Run() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2853\n1:     #14 0x654b96ffc972 in testing::TestSuite::Run() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:3012\n1:     #15 0x654b9704261a in testing::internal::UnitTestImpl::RunAllTests() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:5870\n1:     #16 0x654b970cfaca in bool testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2599\n1:     #17 0x654b970a3fc1 in bool testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:2635\n1:     #18 0x654b970356af in testing::UnitTest::Run() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/src/gtest.cc:5444\n1:     #19 0x654b96a4ad76 in RUN_ALL_TESTS() /home/ubuntu/repos/fprime-devices-reference/lib/fprime/googletest/googletest/include/gtest/gtest.h:2293\n1:     #20 0x654b96a3a22e in main /home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/test/ut/SunCamMgrTestMain.cpp:52\n1:     #21 0x7ecc72e29d8f  (/lib/x86_64-linux-gnu/libc.so.6+0x29d8f) (BuildId: 12b87db2df813df96f66d6f02dd18ea5c8b7cf8d)\n1: \n1: SUMMARY: AddressSanitizer: 193120 byte(s) leaked in 136 allocation(s).\n1/1 Test #1: fprime-devices_KissCam_Components_SunCamMgr_ut_exe ...***Failed    1.28 sec\n\n0% tests passed, 1 tests failed out of 1\n\nTotal Test time (real) =   1.36 sec\n\nThe following tests FAILED:\n\t  1 - fprime-devices_KissCam_Components_SunCamMgr_ut_exe (Failed)\n[INFO] Running CTest with context: ['fprime-devices_KissCam_Components_SunCamMgr_ut_exe']\nErrors while running CTest\nOutput from these tests are in: /home/ubuntu/repos/fprime-devices-reference/build-fprime-automatic-native-ut/fprime-devices/KissCam/Components/SunCamMgr/Testing/Temporary/LastTest.log\nUse \"--rerun-failed --output-on-failure\" to re-run the failed cases verbosely.\n[ERROR] CalledProcessError: Command '['ctest', '--test-dir', '/home/ubuntu/repos/fprime-devices-reference/build-fprime-automatic-native-ut/fprime-devices/KissCam/Components/SunCamMgr', '--no-tests=error', '-V', '-R', '^(fprime-devices_KissCam_Components_SunCamMgr_ut_exe)$']' returned non-zero exit status 8.\n"
+      ],
+      "detail": ""
+    },
+    "C1": {
+      "id": "C1",
+      "name": "Topology instantiation and compile",
+      "category": "close-out",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "1 deployment(s) checked for 'SunCamMgr'"
+    },
+    "U1": {
+      "id": "U1",
+      "name": "Unit-test results published",
+      "category": "unit-test",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "skip",
+      "failures": [],
+      "detail": "not done yet: no published unit-test artifacts given (--artifacts-dir)"
+    },
+    "C3": {
+      "id": "C3",
+      "name": "CI passes on commit",
+      "category": "close-out",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "fail",
+      "failures": [
+        "no check runs reported for a798095e27e64eccddc8165813daf59d1341b016"
+      ],
+      "detail": "0 check run(s)"
+    },
+    "SDD": {
+      "id": "SDD",
+      "name": "SDD structural grade",
+      "category": "design",
+      "module": "/home/ubuntu/repos/fprime-devices-reference/lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr",
+      "status": "pass",
+      "failures": [],
+      "detail": "tier platinum"
+    }
+  },
+  "codeql": {
+    "ran": true,
+    "tool": "clang-tidy",
+    "reason": "",
+    "rules_run": [
+      "cpp/fprime/assert-on-untrusted-input",
+      "cpp/fprime/checking-parameter-values",
+      "cpp/fprime/command-response",
+      "cpp/fprime/compound-statements",
+      "cpp/fprime/define-constant",
+      "cpp/fprime/division-guard",
+      "cpp/fprime/float-division-guard",
+      "cpp/fprime/float-equality",
+      "cpp/fprime/float-loop-control",
+      "cpp/fprime/float-narrowing",
+      "cpp/fprime/for-header-flow-control",
+      "cpp/fprime/global-mutable-variable",
+      "cpp/fprime/incomplete-code",
+      "cpp/fprime/internal-port-invoke",
+      "cpp/fprime/isr-complexity",
+      "cpp/fprime/jpl-c/basic-int-types",
+      "cpp/fprime/jpl-c/checking-return-values",
+      "cpp/fprime/jpl-c/loop-bounds",
+      "cpp/fprime/jpl-c/multiple-stmts-per-line",
+      "cpp/fprime/jpl-c/multiple-var-decls-per-line",
+      "cpp/fprime/jpl-c/no-boolean-side-effects",
+      "cpp/fprime/jpl-c/non-const-function-pointer",
+      "cpp/fprime/jpl-c/preprocessor-use-ifdef",
+      "cpp/fprime/jpl-c/use-of-assertions-constant",
+      "cpp/fprime/jpl-c/use-of-assertions-density",
+      "cpp/fprime/jpl-c/use-of-assertions-non-boolean",
+      "cpp/fprime/jpl-c/use-of-assertions-side-effect",
+      "cpp/fprime/magic-numbers",
+      "cpp/fprime/no-blocking-in-isr",
+      "cpp/fprime/no-blocking-in-sched-handler",
+      "cpp/fprime/no-file-access-in-critical",
+      "cpp/fprime/no-float-in-isr",
+      "cpp/fprime/no-function-decl-in-function",
+      "cpp/fprime/no-printf",
+      "cpp/fprime/public-data-member",
+      "cpp/fprime/signed-overflow",
+      "cpp/fprime/switch-case-fallthrough",
+      "cpp/fprime/switch-default",
+      "cpp/fprime/unchecked-array-index",
+      "cpp/fprime/unguarded-unsigned-subtraction",
+      "cpp/fprime/uninitialized-member",
+      "cpp/fprime/unthrottled-cyclic-event",
+      "cpp/fprime/validation-failure-return",
+      "cpp/uninitialized-local"
+    ],
+    "autocode_findings": 0,
+    "findings": {
+      "cpp/fprime/checking-parameter-values": [
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 686,
+          "message": "Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 687,
+          "message": "Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 688,
+          "message": "Parameter frame is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 772,
+          "message": "Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 773,
+          "message": "Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 774,
+          "message": "Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 810,
+          "message": "Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 811,
+          "message": "Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 959,
+          "message": "Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 960,
+          "message": "Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        },
+        {
+          "rule": "cpp/fprime/checking-parameter-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 961,
+          "message": "Parameter payload is dereferenced without first being checked (e.g. with FW_ASSERT or a condition)."
+        }
+      ],
+      "cpp/fprime/division-guard": [
+        {
+          "rule": "cpp/fprime/division-guard",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 541,
+          "message": "The divisor m_linesPerSlot is not checked against zero before this % operation."
+        }
+      ],
+      "cpp/fprime/jpl-c/checking-return-values": [
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 115,
+          "message": "The return value of non-void function memset is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 116,
+          "message": "The return value of non-void function memset is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 117,
+          "message": "The return value of non-void function memset is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 118,
+          "message": "The return value of non-void function memset is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 119,
+          "message": "The return value of non-void function memset is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 120,
+          "message": "The return value of non-void function memset is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 300,
+          "message": "The return value of non-void function memcpy is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 301,
+          "message": "The return value of non-void function memset is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 620,
+          "message": "The return value of non-void function memcpy is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 674,
+          "message": "The return value of non-void function memcpy is not checked."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/checking-return-values",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 961,
+          "message": "The return value of non-void function memcpy is not checked."
+        }
+      ],
+      "cpp/fprime/jpl-c/use-of-assertions-density": [
+        {
+          "rule": "cpp/fprime/jpl-c/use-of-assertions-density",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 133,
+          "message": "All functions of more than 10 lines should have at least one assertion, unless they handle errors by returning a status enum or bool, or by emitting a WARNING/FATAL event."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/use-of-assertions-density",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 197,
+          "message": "All functions of more than 10 lines should have at least one assertion, unless they handle errors by returning a status enum or bool, or by emitting a WARNING/FATAL event."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/use-of-assertions-density",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 623,
+          "message": "All functions of more than 10 lines should have at least one assertion, unless they handle errors by returning a status enum or bool, or by emitting a WARNING/FATAL event."
+        },
+        {
+          "rule": "cpp/fprime/jpl-c/use-of-assertions-density",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 1018,
+          "message": "All functions of more than 10 lines should have at least one assertion, unless they handle errors by returning a status enum or bool, or by emitting a WARNING/FATAL event."
+        }
+      ],
+      "cpp/fprime/magic-numbers": [
+        {
+          "rule": "cpp/fprime/magic-numbers",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 488,
+          "message": "Magic number 5; consider a named constant (enum, static constexpr, or #define)."
+        },
+        {
+          "rule": "cpp/fprime/magic-numbers",
+          "file": "lib/fprime-devices/fprime-devices/KissCam/Components/SunCamMgr/SunCamMgr.cpp",
+          "line": 489,
+          "message": "Magic number 6; consider a named constant (enum, static constexpr, or #define)."
+        }
+      ],
+      "cpp/fprime/jpl-c/loop-bounds": [],
+      "cpp/fprime/unthrottled-cyclic-event": [],
+      "cpp/fprime/switch-default": [],
+      "cpp/fprime/switch-case-fallthrough": [],
+      "cpp/fprime/global-mutable-variable": [],
+      "cpp/fprime/public-data-member": [],
+      "cpp/fprime/float-equality": [],
+      "cpp/fprime/float-narrowing": [],
+      "cpp/fprime/float-loop-control": [],
+      "cpp/fprime/uninitialized-member": [],
+      "cpp/uninitialized-local": [],
+      "cpp/fprime/command-response": [],
+      "cpp/fprime/validation-failure-return": [],
+      "cpp/fprime/internal-port-invoke": [],
+      "cpp/fprime/assert-on-untrusted-input": [],
+      "cpp/fprime/no-float-in-isr": [],
+      "cpp/fprime/isr-complexity": [],
+      "cpp/fprime/no-blocking-in-isr": [],
+      "cpp/fprime/no-blocking-in-sched-handler": [],
+      "cpp/fprime/no-file-access-in-critical": [],
+      "cpp/fprime/compound-statements": [],
+      "cpp/fprime/float-division-guard": [],
+      "cpp/fprime/unchecked-array-index": [],
+      "cpp/fprime/no-function-decl-in-function": [],
+      "cpp/fprime/for-header-flow-control": [],
+      "cpp/fprime/signed-overflow": [],
+      "cpp/fprime/define-constant": [],
+      "cpp/fprime/no-printf": [],
+      "cpp/fprime/jpl-c/basic-int-types": [],
+      "cpp/fprime/incomplete-code": []
+    }
+  }
+}
