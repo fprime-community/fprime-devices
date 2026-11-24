@@ -48,9 +48,9 @@ Table 1 — Constants (compile-time configuration)
 
 | Name | Value | Meaning |
 |---|---|---|
-| FRAM_SIZE | 262144 | Addressable bytes, at most 2^24 (three address bytes); a request needs 1 ≤ N, offset ≤ FRAM_SIZE − N and a non-null buffer data pointer |
-| FRAM_MAX_TRANSFER | 64 | Largest N per request (bounds the component's frame buffer); at least 6 so the 10-byte startup RDID frame fits |
-| FRAM_CLIENT_PORTS | 2 | Number of client request/completion port pairs |
+| Size | 262144 | Addressable bytes, at most 2^24 (three address bytes); a request needs 1 ≤ N, offset ≤ FRAM_SIZE − N and a non-null buffer data pointer |
+| MaxTransfer | 64 | Largest N per request (bounds the component's frame buffer); at least 6 so the 10-byte startup RDID frame fits |
+| ClientPorts | 2 | Number of client request/completion port pairs |
 | EXPECTED_DEVICE_ID | configurable; default 00 2A C2 7F 7F 7F 7F 7F 7F | Expected 9-byte RDID reply in wire order (first byte received first), set per fitted family member: default = CY15B102QN-50SXI (002-26764 Rev. *D); CY15B102QN-50SXE = 60 2A C2 7F 7F 7F 7F 7F 7F |
 
 Table 2 — Events
